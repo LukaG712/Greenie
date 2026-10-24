@@ -9,7 +9,7 @@ import json
 import logging
 import os
 from dataclasses import asdict, dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
@@ -97,7 +97,7 @@ class MCPClient:
                 logger.warning(f"stdio transport not supported for server {self.server.name}")
                 return False
 
-            self.server.connectedAt = datetime.utcnow().isoformat()
+            self.server.connectedAt = datetime.now(timezone.utc).isoformat()
             logger.info(f"Connected to MCP server: {self.server.name}")
             return True
         except Exception as e:

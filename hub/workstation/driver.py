@@ -51,12 +51,12 @@ def ensure_network(network_name: str) -> bool:
                 logger.debug(f"Network '{network_name}' already exists")
                 return True
 
-        # Create the network with default-deny style configuration
+        # Create the network with inter-container communication disabled for isolation
         client.networks.create(
             network_name,
             driver="bridge",
             internal=False,
-            options={"com.docker.network.bridge.enable_icc": "true"},
+            options={"com.docker.network.bridge.enable_icc": "false"},
         )
         logger.info(f"Created Docker network '{network_name}'")
         return True
@@ -267,7 +267,7 @@ def exec_in_container(container_id: str, command: str, timeout: int = 60) -> dic
     """Execute a command inside a running container.
 
     Returns a dict with exit_code, stdout, and stderr.
-    The command is passed as a list of arguments to prevent shell injection.
+    The command is quoted to prevent shell injection.
     """
     import shlex
     client = _get_docker()
@@ -276,8 +276,8 @@ def exec_in_container(container_id: str, command: str, timeout: int = 60) -> dic
 
     try:
         container = client.containers.get(container_id)
-        # Use list-based command to prevent shell injection via /bin/sh -c
-        result = container.exec_run(["/bin/sh", "-c", command], demux=True)
+        # Quote the command to prevent shell injection via /bin/sh -c
+        result = container.exec_run(["/bin/sh", "-c", shlex.quote(command)], demux=True)
         exit_code = result.exit_code
         stdout = result.output[0].decode("utf-8", errors="replace") if result.output[0] else ""
         stderr = result.output[1].decode("utf-8", errors="replace") if result.output[1] else ""

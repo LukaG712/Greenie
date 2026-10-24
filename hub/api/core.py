@@ -166,8 +166,12 @@ def _sse_remove_buffer(run_id: str) -> None:
 
 
 def _sse_store_core(run_id: str, event: str, sse_event: str, is_terminal: bool) -> int:
-    """Core logic for storing an SSE event. Must be called with lock held."""
+    """Core logic for storing an SSE event. Must be called with lock held.
+    
+    Raises AssertionError if called without the lock to prevent race conditions.
+    """
     global _sse_next_id
+    assert _sse_event_store_lock.locked(), "_sse_store_core must be called with _sse_event_store_lock held"
     if run_id not in _sse_event_store:
         _sse_event_store[run_id] = SSERunStore()
     store = _sse_event_store[run_id]
@@ -631,8 +635,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except RuntimeError as e:
         logger.error(f"API key validation failed: {e}")
         raise
-    # Start periodic auth failure store cleanup
-    asyncio.create_task(_auth_failure_cleanup_task())
+    # Start periodic auth failure store cleanup (store reference for cleanup on shutdown)
+    app.state._auth_cleanup_task = asyncio.create_task(_auth_failure_cleanup_task())
     try:
         from hub import queue_manager
         queue_manager.recover_queue()
@@ -760,6 +764,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         except Exception as e:
             logger.warning(f"Failed to initialize marketplace: {e}")
     yield
+    # Cancel background tasks on shutdown
+    if hasattr(app.state, '_auth_cleanup_task'):
+        app.state._auth_cleanup_task.cancel()
+        try:
+            await app.state._auth_cleanup_task
+        except asyncio.CancelledError:
+            pass
     routines_engine.stop_scheduler()
     # Shutdown cluster support
     if cluster_module is not None:
@@ -820,29 +831,28 @@ def create_app() -> FastAPI:
             all_ready = False
             logger.warning(f"Database readiness check failed: {e}")
         
-        # Check optional dependencies
+        # Check optional dependencies using a shared client
         import httpx as httpx_lib
         timeout = httpx_lib.Timeout(2.0)
         
-        # Check Gobber (optional)
-        try:
-            gobber_url = os.environ.get("GOBBER_URL", "http://gobber:8085")
-            if not gobber_url.startswith("http://localhost"):
-                async with httpx_lib.AsyncClient(timeout=timeout) as client:
+        async with httpx_lib.AsyncClient(timeout=timeout) as client:
+            # Check Gobber (optional)
+            try:
+                gobber_url = os.environ.get("GOBBER_URL", "http://gobber:8085")
+                if not gobber_url.startswith("http://localhost"):
                     resp = await client.get(f"{gobber_url}/health")
                     checks["dependencies"]["gobber"] = resp.status_code == 200
-        except Exception:
-            checks["dependencies"]["gobber"] = False
-        
-        # Check Hider (optional)
-        try:
-            hider_url = os.environ.get("HIDER_URL", "http://hider:8087")
-            if not hider_url.startswith("http://localhost"):
-                async with httpx_lib.AsyncClient(timeout=timeout) as client:
+            except Exception:
+                checks["dependencies"]["gobber"] = False
+            
+            # Check Hider (optional)
+            try:
+                hider_url = os.environ.get("HIDER_URL", "http://hider:8087")
+                if not hider_url.startswith("http://localhost"):
                     resp = await client.get(f"{hider_url}/health")
                     checks["dependencies"]["hider"] = resp.status_code == 200
-        except Exception:
-            checks["dependencies"]["hider"] = False
+            except Exception:
+                checks["dependencies"]["hider"] = False
         
         status_code = 200 if all_ready else 503
         return JSONResponse(

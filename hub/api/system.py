@@ -8,7 +8,7 @@ import logging
 import os
 import platform
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
@@ -25,7 +25,7 @@ MAX_LOG_ENTRIES = 1000
 def _add_log(level: str, service: str, message: str):
     """Add a log entry to the buffer."""
     entry = {
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "level": level,
         "service": service,
         "message": message,

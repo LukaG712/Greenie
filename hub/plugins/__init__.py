@@ -9,7 +9,7 @@ import logging
 import os
 import uuid
 from dataclasses import asdict, dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -59,7 +59,7 @@ class PluginRegistry:
                         plugin_type=plugin_data.get("type", "tool"),
                         enabled=plugin_data.get("enabled", True),
                         source=plugin_data.get("source", ""),
-                        installed_at=plugin_data.get("installed_at", datetime.utcnow().isoformat()),
+                        installed_at=plugin_data.get("installed_at", datetime.now(timezone.utc).isoformat()),
                         config=plugin_data.get("config", {}),
                         entry_point=plugin_data.get("entry_point", ""),
                         dependencies=plugin_data.get("dependencies", []),
@@ -107,7 +107,7 @@ class PluginRegistry:
             plugin_type=plugin_type,
             enabled=True,
             source=source,
-            installed_at=datetime.utcnow().isoformat(),
+            installed_at=datetime.now(timezone.utc).isoformat(),
             config=config or {},
         )
         self.plugins[plugin.id] = plugin
