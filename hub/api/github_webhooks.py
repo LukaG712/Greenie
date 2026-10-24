@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import json
 import logging
+import weakref
 
 from fastapi import Depends, HTTPException, Request
 
@@ -13,6 +14,9 @@ from hub.api.core import _verify_token, _webhook_secrets, _webhook_secrets_lock
 from hub.config import load_config, save_config, set_primary_bot, validate_name
 
 logger = logging.getLogger(__name__)
+
+# Background tasks for webhook pipelines
+_webhook_background_tasks: set = set()
 
 
 def _verify_github_signature(payload: bytes, signature: str, secret: str) -> bool:
@@ -143,7 +147,9 @@ async def api_github_webhook(request: Request):
                 except Exception as e:
                     logger.error(f"Webhook pipeline failed: {e}")
             
-            asyncio.create_task(_run_webhook_pipeline(steps, context))
+            task = asyncio.create_task(_run_webhook_pipeline(steps, context))
+            _webhook_background_tasks.add(task)
+            task.add_done_callback(_webhook_background_tasks.discard)
             triggered.append(pipeline_id or "inline")
     
     logger.info(
@@ -259,7 +265,9 @@ async def api_gitlab_webhook(request: Request):
                 except Exception as e:
                     logger.error(f"GitLab webhook pipeline failed: {e}")
             
-            asyncio.create_task(_run_webhook_pipeline(steps, context))
+            task = asyncio.create_task(_run_webhook_pipeline(steps, context))
+            _webhook_background_tasks.add(task)
+            task.add_done_callback(_webhook_background_tasks.discard)
             triggered.append("inline")
     
     logger.info(

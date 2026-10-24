@@ -90,7 +90,7 @@ class TaskCoordinator:
         self.max_concurrency = max_concurrency
         self.worktree_base = worktree_base or str(Path(self.project_dir) / ".worktrees")
         self._tasks: Dict[str, CoordinatedTask] = {}
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._running_count = 0
         self._stop_event = threading.Event()
         self._threads: List[threading.Thread] = []
