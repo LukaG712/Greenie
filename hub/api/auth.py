@@ -34,7 +34,14 @@ logger = get_logger(__name__)
 # Session settings
 SESSION_MAX_AGE = int(os.environ.get("SESSION_MAX_AGE", str(8 * 3600)))  # 8 hours default
 SESSION_COOKIE_NAME = os.environ.get("SESSION_COOKIE_NAME", "evershade_session")
-SESSION_SECRET = os.environ.get("SESSION_SECRET", secrets.token_hex(32))
+_SESSION_SECRET_DEFAULT = "evershade-default-session-secret-change-me"
+SESSION_SECRET = os.environ.get("SESSION_SECRET", _SESSION_SECRET_DEFAULT)
+
+if SESSION_SECRET == _SESSION_SECRET_DEFAULT:
+    logger.warning(
+        "SESSION_SECRET is using the default value. "
+        "Set the SESSION_SECRET environment variable to a strong random value for production."
+    )
 SESSION_SECURE = os.environ.get("SESSION_SECURE", "false").lower() == "true"
 SESSION_SAME_SITE = os.environ.get("SESSION_SAME_SITE", "lax")
 
@@ -148,6 +155,24 @@ _users_lock = threading.Lock()
 # Session store: session_id -> session data
 _sessions: Dict[str, Dict[str, Any]] = {}
 _sessions_lock = threading.Lock()
+
+
+def load_from_db() -> None:
+    """Load users and sessions from the database into memory.
+
+    Call this on startup to restore persisted auth data.
+    """
+    try:
+        from hub.feature_store import init_auth_users, init_auth_sessions
+        with _users_lock:
+            _users.clear()
+            _users.update(init_auth_users())
+        with _sessions_lock:
+            _sessions.clear()
+            _sessions.update(init_auth_sessions())
+        logger.info(f"Loaded {len(_users)} users and {len(_sessions)} sessions from database")
+    except Exception as e:
+        logger.warning(f"Failed to load auth data from database: {e}")
 
 
 # ─── User management ────────────────────────────────────────────────────────
@@ -587,8 +612,11 @@ async def login(username: str, password: str, response: Response) -> Dict[str, A
     with _users_lock:
         user = _users.get(username)
         if not user:
-            # Use constant-time comparison to prevent timing attacks
-            verify_password(password, hashlib.sha256(password.encode()).hexdigest())
+            # Use a dummy hash to prevent timing attacks on username enumeration
+            # This ensures the verification path takes the same amount of time
+            # whether the user exists or not
+            dummy_hash = hash_password("dummy-password-for-timing-protection")
+            verify_password(password, dummy_hash)
             raise HTTPException(status_code=401, detail="Invalid username or password")
         
         if not user.get("is_active", True):
