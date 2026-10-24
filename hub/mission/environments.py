@@ -323,9 +323,10 @@ def validate_environment(env_id: str) -> dict[str, Any]:
     # Run health check command if specified
     if env.health_check_command:
         try:
+            import shlex
             proc = subprocess.run(
-                env.health_check_command,
-                shell=True,
+                shlex.split(env.health_check_command),
+                shell=False,
                 capture_output=True,
                 text=True,
                 timeout=30,
