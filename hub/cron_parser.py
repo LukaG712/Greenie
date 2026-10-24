@@ -18,7 +18,7 @@ Also supports shortcuts:
 
 import calendar
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Tuple
 
 # Cron shortcuts

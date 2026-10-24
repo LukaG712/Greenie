@@ -3,7 +3,7 @@
 import logging
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import Depends, HTTPException
@@ -135,7 +135,7 @@ _dag_tasks: Dict[str, Dict[str, Any]] = {}
 _dag_tasks_lock = threading.Lock()
 
 # DAG execution history
-_dag_executions: List[Dict[str, Any]] = {}
+_dag_executions: List[Dict[str, Any]] = []
 _dag_executions_lock = threading.Lock()
 
 

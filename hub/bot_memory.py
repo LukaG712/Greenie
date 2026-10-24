@@ -20,7 +20,7 @@ def _bot_memory_path(bot_id: str) -> Path:
     if not NAME_RE.match(bot_id):
         raise ValueError(f"Invalid bot ID for memory file: {bot_id}")
     config = load_config()
-    data_dir = Path(config.get("data_dir", "data"))
+    data_dir = Path(config.get("data_dir", "data")).resolve()
     return data_dir / "bots" / bot_id / "memory.md"
 
 

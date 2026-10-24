@@ -5,7 +5,7 @@ import os
 import threading
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import Depends, HTTPException

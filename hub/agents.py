@@ -35,7 +35,9 @@ def create_agent(
 ) -> Dict[str, Any]:
     if not validate_name(name):
         raise ValueError(f"Invalid agent name: {name}")
-    config = load_config()
+    # Use load_config_locked to prevent race conditions with concurrent modifications
+    from hub.config import load_config_locked
+    config = load_config_locked()
     agent_data = {
         "title": title,
         "description": description,
@@ -52,14 +54,18 @@ def create_agent(
 
 
 def update_agent_data(name: str, updates: Dict[str, Any]) -> Dict[str, Any]:
-    config = load_config()
+    # Use load_config_locked to prevent race conditions with concurrent modifications
+    from hub.config import load_config_locked
+    config = load_config_locked()
     config = update_agent(config, name, updates)
     save_config(config)
     return get_agent_config(config, name)
 
 
 def delete_agent_by_name(name: str) -> None:
-    config = load_config()
+    # Use load_config_locked to prevent race conditions with concurrent modifications
+    from hub.config import load_config_locked
+    config = load_config_locked()
     config = delete_agent(config, name)
     save_config(config)
 

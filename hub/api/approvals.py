@@ -3,7 +3,7 @@
 import logging
 import threading
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -20,8 +20,8 @@ _approvals_lock = threading.Lock()
 
 
 def _emit_event(event: str, data: Dict[str, Any]) -> None:
-    """Emit a webhook event (no-op placeholder)."""
-    pass
+    """Emit a webhook event for approval state changes."""
+    logger.info(f"Approval event: {event} - {data}")
 
 
 async def api_list_approvals(
@@ -199,8 +199,9 @@ async def api_approval_stats(_auth: None = Depends(_verify_token)):
 _file_store: Dict[str, Dict[str, Any]] = {}
 _file_store_lock = threading.Lock()
 
-_UPLOAD_DIR = Path(__file__).resolve().parent / "uploads"
-_UPLOAD_DIR.mkdir(exist_ok=True)
+# Upload directory - use environment variable or default to user's data directory
+_UPLOAD_DIR = Path(os.environ.get("EVERSHADE_UPLOAD_DIR", str(Path.home() / ".evershade" / "data" / "uploads")))
+_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 _MAX_FILE_SIZE = 50 * 1024 * 1024
 

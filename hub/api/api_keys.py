@@ -1,10 +1,11 @@
 """Route module: api_keys."""
 
 import logging
+import secrets
 import threading
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import Depends, HTTPException
@@ -34,8 +35,8 @@ async def api_create_api_key(body: Dict[str, Any], _auth: None = Depends(_verify
     permissions = body.get("permissions", ["*"])
     expires_in_days = body.get("expires_in_days")
 
-    # Generate key
-    key_value = uuid.uuid4().hex + uuid.uuid4().hex[:16]
+    # Generate key using secrets module for cryptographic strength
+    key_value = secrets.token_hex(24)
 
     expires_at = None
     if expires_in_days:
@@ -69,8 +70,9 @@ async def api_create_api_key(body: Dict[str, Any], _auth: None = Depends(_verify
 async def api_list_api_keys(_auth: None = Depends(_verify_token)):
     """List all API keys (without the actual key values)."""
     with _api_keys_lock:
-        keys = list(_api_keys.values())
-    # Strip key values
+        # Create copies to avoid mutating the original dicts
+        keys = [dict(v) for v in _api_keys.values()]
+    # Strip key values from copies
     for k in keys:
         k.pop("key", None)
     return {"keys": keys}
@@ -109,6 +111,7 @@ async def api_update_api_key(key_id: str, body: Dict[str, Any], _auth: None = De
 
 async def api_delete_api_key(key_id: str, _auth: None = Depends(_verify_token)):
     """Delete (revoke) an API key."""
+    key_val = None
     with _api_keys_lock:
         key_data = next((k for k, v in _api_keys.items() if v["id"] == key_id), None)
         if not key_data:
@@ -119,10 +122,11 @@ async def api_delete_api_key(key_id: str, _auth: None = Depends(_verify_token)):
                 del _api_keys[key_val]
                 break
     # Persist to database
-    try:
-        feature_store.delete_api_key(key_val)
-    except Exception as e:
-        logger.warning(f"Failed to delete API key: {e}")
+    if key_val:
+        try:
+            feature_store.delete_api_key(key_val)
+        except Exception as e:
+            logger.warning(f"Failed to delete API key: {e}")
     return {"status": "ok", "message": "API key revoked"}
 
 

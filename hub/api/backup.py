@@ -7,7 +7,7 @@ import os
 import shutil
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -17,8 +17,8 @@ from hub.api.core import _verify_token, _webhook_secrets, _webhook_secrets_lock
 
 logger = logging.getLogger(__name__)
 
-# Backup directory
-_BACKUP_DIR = Path(os.path.join(os.path.dirname(__file__), '..', '..', 'data', 'backups'))
+# Backup directory - use environment variable or default to /tmp for containers
+_BACKUP_DIR = Path(os.environ.get("EVERSHADE_BACKUP_DIR", str(Path.home() / ".evershade" / "data" / "backups")))
 
 
 async def api_create_backup(_auth: None = Depends(_verify_token)):
@@ -40,7 +40,7 @@ async def api_create_backup(_auth: None = Depends(_verify_token)):
         raise HTTPException(status_code=404, detail="Database file not found")
 
     # Create backup filename with timestamp
-    timestamp = dt.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     backup_name = f"hub_backup_{timestamp}.db"
     backup_path = _BACKUP_DIR / backup_name
 
@@ -98,7 +98,13 @@ async def api_restore_backup(backup_file: str, _auth: None = Depends(_verify_tok
     """
     import sqlite3
 
-    backup_path = _BACKUP_DIR / backup_file
+    # Prevent path traversal attacks
+    if ".." in backup_file or backup_file.startswith("/"):
+        raise HTTPException(status_code=400, detail="Invalid backup file name")
+    backup_path = (_BACKUP_DIR / backup_file).resolve()
+    # Ensure the resolved path is within _BACKUP_DIR
+    if not str(backup_path).startswith(str(_BACKUP_DIR.resolve())):
+        raise HTTPException(status_code=400, detail="Invalid backup file path")
     if not backup_path.exists():
         raise HTTPException(status_code=404, detail=f"Backup file not found: {backup_file}")
 
@@ -138,7 +144,13 @@ async def api_restore_backup(backup_file: str, _auth: None = Depends(_verify_tok
 
 async def api_delete_backup(backup_file: str, _auth: None = Depends(_verify_token)):
     """Delete a backup file."""
-    backup_path = _BACKUP_DIR / backup_file
+    # Prevent path traversal attacks
+    if ".." in backup_file or backup_file.startswith("/"):
+        raise HTTPException(status_code=400, detail="Invalid backup file name")
+    backup_path = (_BACKUP_DIR / backup_file).resolve()
+    # Ensure the resolved path is within _BACKUP_DIR
+    if not str(backup_path).startswith(str(_BACKUP_DIR.resolve())):
+        raise HTTPException(status_code=400, detail="Invalid backup file path")
     if not backup_path.exists():
         raise HTTPException(status_code=404, detail=f"Backup file not found: {backup_file}")
 

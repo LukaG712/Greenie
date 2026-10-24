@@ -303,28 +303,32 @@ def change_password(username: str, old_password: str, new_password: str) -> bool
     if len(new_password) < 8:
         raise ValueError("New password must be at least 8 characters")
     
+    user_id = None
     with _users_lock:
         user = _users.get(username)
         if not user:
             raise ValueError("User not found")
-        
+
         if not verify_password(old_password, user["password_hash"]):
             raise ValueError("Current password is incorrect")
-        
+
         user["password_hash"] = hash_password(new_password)
         user["updated_at"] = datetime.now(timezone.utc).isoformat()
         logger.info(f"Password changed for user: {username}")
-        
+
         # Persist to database
         try:
             from hub.feature_store import save_auth_user
             save_auth_user(user)
         except Exception as e:
             logger.warning(f"Failed to persist password change to database: {e}")
-        
-        # Revoke all existing sessions
-        _revoke_all_sessions_for_user(user["id"])
-        return True
+
+        user_id = user["id"]
+
+    # Revoke all existing sessions (outside _users_lock to avoid deadlock with _sessions_lock)
+    if user_id:
+        _revoke_all_sessions_for_user(user_id)
+    return True
 
 
 def list_users() -> List[Dict[str, Any]]:
@@ -701,7 +705,8 @@ def initialize_default_admin(username: str = "admin", password: str = "") -> Dic
     # Generate random password if not provided
     if not password:
         password = secrets.token_urlsafe(16)
-        logger.warning(f"Generated random admin password: {password}")
+        # Log masked password to avoid leaking the actual value in logs
+        logger.warning("Generated random admin password (masked): %s...", password[:4])
     
     try:
         user = create_user(username, password, role="admin", display_name="Administrator")

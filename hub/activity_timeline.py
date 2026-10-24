@@ -353,7 +353,8 @@ def timeline_stats() -> dict:
 
 def prune_old_events(retain_days: int = 90):
     """Remove events older than retain_days to manage disk usage."""
-    cutoff = datetime.now(timezone.utc).isoformat()
+    from datetime import timedelta
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=retain_days)).isoformat()
     conn = _get_connection()
     try:
         deleted = conn.execute(

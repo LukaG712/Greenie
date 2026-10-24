@@ -243,18 +243,22 @@ async def reset_password_endpoint(
     if not new_password:
         new_password = secrets.token_urlsafe(12)
     
+    user_id = None
     with _users_lock:
         user = _users.get(username)
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
-        
+
         user["password_hash"] = hash_password(new_password)
-        _revoke_all_sessions_for_user(user["id"])
+        user_id = user["id"]
+
+    # Revoke all existing sessions (outside _users_lock to avoid deadlock with _sessions_lock)
+    if user_id:
+        _revoke_all_sessions_for_user(user_id)
     
     logger.info(f"Admin {admin_user['username']} reset password for user {username}")
     return {
         "message": f"Password for '{username}' has been reset",
-        "new_password": new_password,
     }
 
 
