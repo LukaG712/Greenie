@@ -422,7 +422,12 @@ def test_hook(hook_id: str, context: Optional[dict[str, Any]] = None) -> HookExe
     if hook is None:
         raise ValueError(f"Hook {hook_id} not found")
 
-    return execute_hooks(hook.event, context)[0] if execute_hooks(hook.event, context) else HookExecutionResult(
+    results = execute_hooks(hook.event, context)
+    # Find the result for the specific hook being tested
+    for result in results:
+        if result.hook_id == hook_id:
+            return result
+    return HookExecutionResult(
         hook_id=hook_id,
         event=hook.event,
         success=False,
