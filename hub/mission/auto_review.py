@@ -175,10 +175,12 @@ def review_mission_changes(
 
 def _run_command(cmd: str, cwd: str, timeout: int = 60) -> dict[str, Any]:
     """Run a shell command and capture output."""
+    import shlex
     try:
+        args = shlex.split(cmd)
         result = subprocess.run(
-            cmd,
-            shell=True,
+            args,
+            shell=False,
             cwd=cwd,
             capture_output=True,
             text=True,

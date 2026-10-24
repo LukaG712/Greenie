@@ -267,14 +267,17 @@ def exec_in_container(container_id: str, command: str, timeout: int = 60) -> dic
     """Execute a command inside a running container.
 
     Returns a dict with exit_code, stdout, and stderr.
+    The command is passed as a list of arguments to prevent shell injection.
     """
+    import shlex
     client = _get_docker()
     if client is None:
         return {"exit_code": -1, "stdout": "", "stderr": "Docker unavailable"}
 
     try:
         container = client.containers.get(container_id)
-        result = container.exec_run(command, demux=True)
+        # Use list-based command to prevent shell injection via /bin/sh -c
+        result = container.exec_run(["/bin/sh", "-c", command], demux=True)
         exit_code = result.exit_code
         stdout = result.output[0].decode("utf-8", errors="replace") if result.output[0] else ""
         stderr = result.output[1].decode("utf-8", errors="replace") if result.output[1] else ""

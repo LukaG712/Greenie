@@ -13,6 +13,7 @@ Route modules import from this module to access stores and helpers.
 
 import asyncio
 import contextlib
+import hmac
 import json
 import logging
 import os
@@ -111,6 +112,26 @@ def _record_auth_failure(client_ip: str) -> None:
         _auth_failure_store[client_ip].append(now)
 
 
+def _cleanup_auth_failure_store() -> None:
+    """Periodically clean up stale entries from the auth failure store to prevent memory leaks."""
+    now = time.time()
+    with _auth_failure_lock:
+        stale_ips = []
+        for ip, timestamps in _auth_failure_store.items():
+            _auth_failure_store[ip] = [t for t in timestamps if now - t < _AUTH_WINDOW_SECONDS]
+            if not _auth_failure_store[ip]:
+                stale_ips.append(ip)
+        for ip in stale_ips:
+            del _auth_failure_store[ip]
+
+
+async def _auth_failure_cleanup_task() -> None:
+    """Background task that periodically cleans up the auth failure store."""
+    while True:
+        await asyncio.sleep(60)
+        _cleanup_auth_failure_store()
+
+
 # ─── SSE event store ────────────────────────────────────────────────────────
 
 _sse_event_store: Dict[str, "SSERunStore"] = {}
@@ -144,44 +165,54 @@ def _sse_remove_buffer(run_id: str) -> None:
         _sse_event_store.pop(run_id, None)
 
 
-def _sse_send_event(run_id: str, event: str, data: str) -> None:
-    """Send an SSE event to the store for a run."""
+def _sse_store_core(run_id: str, event: str, sse_event: str, is_terminal: bool) -> int:
+    """Core logic for storing an SSE event. Must be called with lock held."""
     global _sse_next_id
-    sse_event = f"event: {event}\ndata: {data}\n\n"
-    is_terminal = event in _TERMINAL_EVENTS
+    if run_id not in _sse_event_store:
+        _sse_event_store[run_id] = SSERunStore()
+    store = _sse_event_store[run_id]
 
-    with _sse_event_store_lock:
-        if run_id not in _sse_event_store:
-            _sse_event_store[run_id] = SSERunStore()
-        store = _sse_event_store[run_id]
+    _sse_next_id += 1
+    event_id = _sse_next_id
 
-        _sse_next_id += 1
-        event_id = _sse_next_id
-
-        if len(store.events) >= _SSE_MAX_EVENTS:
-            if is_terminal:
-                removed = False
-                for i in range(len(store.events)):
-                    ev_id, ev_str = store.events[i]
-                    if not any(f"event: {t}" in ev_str for t in _TERMINAL_EVENTS):
-                        oldest_evicted = ev_id
-                        store.events.pop(i)
-                        removed = True
-                        if store.evicted_before_id is None or oldest_evicted > store.evicted_before_id:
-                            store.evicted_before_id = oldest_evicted
-                        break
-                if not removed and store.events:
-                    oldest_evicted = store.events[0][0]
-                    store.events.pop(0)
+    if len(store.events) >= _SSE_MAX_EVENTS:
+        if is_terminal:
+            removed = False
+            for i in range(len(store.events)):
+                ev_id, ev_str = store.events[i]
+                if not any(f"event: {t}" in ev_str for t in _TERMINAL_EVENTS):
+                    oldest_evicted = ev_id
+                    store.events.pop(i)
+                    removed = True
                     if store.evicted_before_id is None or oldest_evicted > store.evicted_before_id:
                         store.evicted_before_id = oldest_evicted
-            else:
+                    break
+            if not removed and store.events:
                 oldest_evicted = store.events[0][0]
                 store.events.pop(0)
                 if store.evicted_before_id is None or oldest_evicted > store.evicted_before_id:
                     store.evicted_before_id = oldest_evicted
+        else:
+            oldest_evicted = store.events[0][0]
+            store.events.pop(0)
+            if store.evicted_before_id is None or oldest_evicted > store.evicted_before_id:
+                store.evicted_before_id = oldest_evicted
 
-        store.events.append((event_id, sse_event))
+    store.events.append((event_id, sse_event))
+    return event_id
+
+
+def _sse_send_event(run_id: str, event: str, data: str) -> None:
+    """Send an SSE event to the store for a run.
+
+    Uses a single threading.Lock for both async and sync contexts to prevent
+    concurrent corruption from dual-lock design.
+    """
+    sse_event = f"event: {event}\ndata: {data}\n\n"
+    is_terminal = event in _TERMINAL_EVENTS
+
+    with _sse_event_store_lock:
+        _sse_store_core(run_id, event, sse_event, is_terminal)
 
 
 # ─── Authentication helpers ─────────────────────────────────────────────────
@@ -203,7 +234,7 @@ def _verify_token(
         _record_auth_failure(client_ip)
         raise HTTPException(status_code=401, detail="Authorization header missing")
     expected = _get_api_key()
-    if credentials.credentials != expected:
+    if not hmac.compare_digest(credentials.credentials, expected):
         _record_auth_failure(client_ip)
         raise HTTPException(status_code=401, detail="Invalid API key")
 
@@ -217,10 +248,10 @@ def _verify_token_or_query(
     _check_auth_rate_limit(client_ip)
     expected = _get_api_key()
     if credentials is not None:
-        if credentials.credentials == expected:
+        if hmac.compare_digest(credentials.credentials, expected):
             return
     cookie_token = request.cookies.get("hub_api_key") if request else None
-    if cookie_token is not None and cookie_token == expected:
+    if cookie_token is not None and hmac.compare_digest(cookie_token, expected):
         return
     _record_auth_failure(client_ip)
     raise HTTPException(status_code=401, detail="Invalid API key")
@@ -593,6 +624,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     recover_stale_runs()
     providers.ensure_default_providers()
     routines_engine.start_scheduler()
+    # Validate API key at startup to fail fast
+    try:
+        _get_api_key()
+        logger.info("API key validated successfully")
+    except RuntimeError as e:
+        logger.error(f"API key validation failed: {e}")
+        raise
+    # Start periodic auth failure store cleanup
+    asyncio.create_task(_auth_failure_cleanup_task())
     try:
         from hub import queue_manager
         queue_manager.recover_queue()
@@ -805,10 +845,13 @@ def create_app() -> FastAPI:
             checks["dependencies"]["hider"] = False
         
         status_code = 200 if all_ready else 503
-        return {
-            "status": "ready" if all_ready else "not_ready",
-            "checks": checks,
-        }
+        return JSONResponse(
+            status_code=status_code,
+            content={
+                "status": "ready" if all_ready else "not_ready",
+                "checks": checks,
+            },
+        )
 
     # CORS middleware
     app.add_middleware(

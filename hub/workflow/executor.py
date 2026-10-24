@@ -15,6 +15,8 @@ import asyncio
 import json
 import logging
 import os
+import re
+import shlex
 import time
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -698,11 +700,12 @@ class WorkflowExecutor:
                 raise RuntimeError("No workstation_id provided for exec action")
 
             command = config.get("command", step.task or "echo 'No command specified'")
-            # Interpolate context variables
+            # Interpolate context variables, sanitizing values to prevent command injection
             for key, value in context.items():
                 placeholder = f"{{{key}}}"
                 if placeholder in command:
-                    command = command.replace(placeholder, str(value)[:2000])
+                    sanitized = shlex.quote(str(value)[:2000])
+                    command = command.replace(placeholder, sanitized)
 
             result = ws_exec(ws_id, command)
             if result is None:
