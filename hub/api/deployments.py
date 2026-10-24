@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import Depends, HTTPException
 
 from hub import feature_store
-from hub.api.core import _circuit_breakers, _circuit_breakers_lock, _deployments, _deployments_lock, _verify_token
+from hub.api.core import _deployments, _deployments_lock, _verify_token
 
 logger = logging.getLogger(__name__)
 
@@ -164,95 +164,6 @@ async def api_deployment_stats(_auth: None = Depends(_verify_token)):
         "avg_duration_seconds": round(avg_duration, 2),
         "last_30_days": len([d for d in deployments if (datetime.now(timezone.utc) - datetime.fromisoformat(d["started_at"])).days < 30]),
     }
-
-
-# ─── Circuit Breaker ────────────────────────────────────────────────────────
-
-# Circuit breaker state per service
-_circuit_breakers: Dict[str, Dict[str, Any]] = {}
-_circuit_breakers_lock = threading.Lock()
-
-# Default circuit breaker config
-_CB_DEFAULT_FAILURE_THRESHOLD = 5
-_CB_DEFAULT_RECOVERY_TIMEOUT = 60  # seconds
-_CB_DEFAULT_SUCCESS_THRESHOLD = 3
-
-
-def _get_circuit_state(service: str) -> Dict[str, Any]:
-    """Get or create circuit breaker state for a service."""
-    with _circuit_breakers_lock:
-        if service not in _circuit_breakers:
-            _circuit_breakers[service] = {
-                "service": service,
-                "state": "closed",  # closed, open, half-open
-                "failure_count": 0,
-                "success_count": 0,
-                "last_failure_at": None,
-                "last_state_change": datetime.now(timezone.utc).isoformat(),
-                "failure_threshold": _CB_DEFAULT_FAILURE_THRESHOLD,
-                "recovery_timeout": _CB_DEFAULT_RECOVERY_TIMEOUT,
-                "success_threshold": _CB_DEFAULT_SUCCESS_THRESHOLD,
-            }
-            # Persist to database
-            try:
-                feature_store.save_circuit_breaker(service, "closed", 0)
-            except Exception as e:
-                logger.warning(f"Failed to save circuit breaker: {e}")
-        return _circuit_breakers[service]
-
-
-def _record_success(service: str) -> str:
-    """Record a successful call and update circuit state."""
-    cb = _get_circuit_state(service)
-    with _circuit_breakers_lock:
-        if cb["state"] == "half-open":
-            cb["success_count"] += 1
-            if cb["success_count"] >= cb["success_threshold"]:
-                cb["state"] = "closed"
-                cb["failure_count"] = 0
-                cb["success_count"] = 0
-                cb["last_state_change"] = datetime.now(timezone.utc).isoformat()
-        elif cb["state"] == "closed":
-            cb["failure_count"] = max(0, cb["failure_count"] - 1)
-        return cb["state"]
-
-
-def _record_failure(service: str) -> str:
-    """Record a failed call and update circuit state."""
-    cb = _get_circuit_state(service)
-    with _circuit_breakers_lock:
-        cb["failure_count"] += 1
-        cb["last_failure_at"] = datetime.now(timezone.utc).isoformat()
-
-        if cb["state"] == "half-open":
-            cb["state"] = "open"
-            cb["last_state_change"] = datetime.now(timezone.utc).isoformat()
-        elif cb["state"] == "closed" and cb["failure_count"] >= cb["failure_threshold"]:
-            cb["state"] = "open"
-            cb["last_state_change"] = datetime.now(timezone.utc).isoformat()
-
-        return cb["state"]
-
-
-def _can_execute(service: str) -> bool:
-    """Check if a service call is allowed by the circuit breaker."""
-    cb = _get_circuit_state(service)
-    if cb["state"] == "closed":
-        return True
-    if cb["state"] == "open":
-        # Check if recovery timeout has elapsed
-        last_change = datetime.fromisoformat(cb["last_state_change"])
-        elapsed = (datetime.now(timezone.utc) - last_change).total_seconds()
-        if elapsed >= cb["recovery_timeout"]:
-            with _circuit_breakers_lock:
-                cb["state"] = "half-open"
-                cb["success_count"] = 0
-                cb["last_state_change"] = datetime.now(timezone.utc).isoformat()
-            return True
-        return False
-    # half-open: allow limited calls
-    return True
-
 
 
 def register(app):

@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import Depends, HTTPException
 
 from hub import feature_store
-from hub.api.core import _deployments, _deployments_lock, _feature_flags, _feature_flags_lock, _verify_token
+from hub.api.core import _feature_flags, _feature_flags_lock, _verify_token
 
 logger = logging.getLogger(__name__)
 
@@ -170,18 +170,6 @@ async def api_flag_evaluations(limit: int = 50, _auth: None = Depends(_verify_to
         evaluations = _flag_evaluations[-limit:]
     evaluations.reverse()
     return {"evaluations": evaluations, "count": len(evaluations)}
-
-
-# ─── Deployment Management ──────────────────────────────────────────────────
-
-# Deployment history
-_deployments: List[Dict[str, Any]] = []
-_deployments_lock = threading.Lock()
-
-# Current deployment info
-_current_deployment: Optional[Dict[str, Any]] = None
-_current_deployment_lock = threading.Lock()
-
 
 
 def register(app):

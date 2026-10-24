@@ -11,8 +11,9 @@ from typing import Any, Dict, List, Optional
 from fastapi import Depends, HTTPException
 
 from hub import feature_store
-from hub.api.core import _response_cache, _response_cache_lock, _verify_token
-from hub.runner import Run, agent_status, get_run, list_runs, recover_stale_runs, run_agent, stop_run
+from hub.api.core import _verify_token
+
+from hub.runner import run_agent
 
 logger = logging.getLogger(__name__)
 

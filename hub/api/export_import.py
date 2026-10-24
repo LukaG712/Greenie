@@ -10,9 +10,8 @@ from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials
 
 from hub import memory
-from hub.api.core import _api_keys, _api_keys_lock, _verify_token, security
-from hub.config import load_config, save_config, set_primary_bot, validate_name
-from hub.runner import Run, agent_status, get_run, list_runs, recover_stale_runs, run_agent, stop_run
+from hub.api.core import _verify_token
+from hub.config import load_config
 
 
 def _get_api_key() -> str:
@@ -82,6 +81,7 @@ async def api_export_runs(
     _auth: None = Depends(_verify_token),
 ):
     """Export runs data as JSON or CSV."""
+    from hub.runner import list_runs
     runs = list_runs(agent=agent, state=state, limit=limit)
 
     if format.lower() == "csv":
@@ -163,56 +163,6 @@ async def api_import_sessions(
             pass  # Skip invalid entries
 
     return {"imported": imported, "total": len(sessions_data)}
-
-
-# ─── API Key Management ─────────────────────────────────────────────────────
-
-# In-memory API key store (in production, use a database)
-_api_keys: Dict[str, Dict[str, Any]] = {}
-_api_keys_lock = threading.Lock()
-
-
-def _verify_token_multi(
-    request: Request,
-    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
-) -> Dict[str, Any]:
-    """Verify token from multiple sources: Authorization header, cookie, or API key store."""
-    client_ip = request.client.host if request else "unknown"
-    _check_auth_rate_limit(client_ip)
-
-    # Try primary API key first
-    expected = _get_api_key()
-    if credentials is not None and credentials.credentials == expected:
-        return {"key_id": "primary", "permissions": "*"}
-
-    # Try API key store
-    if credentials is not None:
-        with _api_keys_lock:
-            key_data = _api_keys.get(credentials.credentials)
-        if key_data and key_data.get("active", True):
-            # Check expiration
-            if key_data.get("expires_at"):
-                try:
-                    expires = datetime.fromisoformat(key_data["expires_at"])
-                    if expires < datetime.now(timezone.utc):
-                        raise HTTPException(status_code=401, detail="API key has expired")
-                except (ValueError, TypeError):
-                    pass
-            return {"key_id": key_data["id"], "permissions": key_data.get("permissions", ["*"])}
-
-    # Try cookie
-    cookie_token = request.cookies.get("hub_api_key") if request else None
-    if cookie_token:
-        if cookie_token == expected:
-            return {"key_id": "primary", "permissions": "*"}
-        with _api_keys_lock:
-            key_data = _api_keys.get(cookie_token)
-        if key_data and key_data.get("active", True):
-            return {"key_id": key_data["id"], "permissions": key_data.get("permissions", ["*"])}
-
-    _record_auth_failure(client_ip)
-    raise HTTPException(status_code=401, detail="Invalid API key")
-
 
 
 def register(app):

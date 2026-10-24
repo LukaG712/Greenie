@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import Depends, HTTPException
 
 from hub import feature_store
-from hub.api.core import _api_versions, _api_versions_lock, _circuit_breakers, _circuit_breakers_lock, _verify_token
+from hub.api.core import _circuit_breakers, _circuit_breakers_lock, _verify_token
 
 logger = logging.getLogger(__name__)
 
@@ -179,27 +179,6 @@ async def api_set_circuit_config(body: Dict[str, Any], _auth: None = Depends(_ve
             cb["success_threshold"] = body["success_threshold"]
 
     return {"status": "ok", "config": cb}
-
-
-# ─── API Versioning & Deprecation ───────────────────────────────────────────
-
-# API version registry
-_api_versions: Dict[str, Dict[str, Any]] = {
-    "v1": {
-        "version": "v1",
-        "status": "current",  # current, deprecated, sunset
-        "release_date": "2024-01-01",
-        "deprecation_date": None,
-        "sunset_date": None,
-        "description": "Current stable API version",
-    },
-}
-_api_versions_lock = threading.Lock()
-
-# Deprecated endpoint mappings: old_path -> new_path
-_deprecated_endpoints: Dict[str, Dict[str, Any]] = {}
-_deprecated_endpoints_lock = threading.Lock()
-
 
 
 def register(app):

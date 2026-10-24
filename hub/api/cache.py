@@ -11,7 +11,6 @@ import httpx
 from fastapi import Depends, HTTPException
 
 from hub.api.core import _message_bus, _message_bus_lock, _response_cache, _response_cache_lock, _verify_token
-from hub.config import load_config, save_config, set_primary_bot, validate_name
 
 # Cache TTL configuration
 _cache_ttl_config: Dict[str, int] = {}
@@ -114,10 +113,6 @@ async def api_delete_cache_ttl(endpoint: str, _auth: None = Depends(_verify_toke
 
 
 # ─── Internal Message Bus (Pub/Sub) ─────────────────────────────────────────
-
-# Topic -> list of message entries
-_message_bus: Dict[str, List[Dict[str, Any]]] = {}
-_message_bus_lock = threading.Lock()
 
 # Topic -> list of subscriber callbacks (webhook URLs)
 _message_subscribers: Dict[str, List[Dict[str, Any]]] = {}

@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import Depends, Form, HTTPException, Request, UploadFile
+from fastapi import Depends, HTTPException, Request
 from starlette.responses import FileResponse
 
 from hub import feature_store
@@ -41,10 +41,6 @@ async def api_upload_file(request: Request, _auth: None = Depends(_verify_token)
     Optional fields: 'run_id' (associate with a run), 'description'.
     """
     import io
-
-    # Use FastAPI's built-in file upload
-    from fastapi import Form, UploadFile
-    from multipart import MultipartParser
 
     # Parse multipart manually since we can't use UploadFile in this signature
     body = await request.body()
@@ -201,34 +197,6 @@ async def api_delete_file(file_id: str, _auth: None = Depends(_verify_token)):
 
     _audit("file.deleted", _auth or "anonymous", "file", f"Deleted {file_meta['filename']}", "")
     return {"status": "ok", "message": "File deleted"}
-
-
-# ─── RBAC (Role-Based Access Control) ───────────────────────────────────────
-
-# Role definitions
-_ROLES: Dict[str, Dict[str, Any]] = {
-    "admin": {
-        "name": "Admin",
-        "permissions": ["*"],
-        "description": "Full access to all resources",
-    },
-    "developer": {
-        "name": "Developer",
-        "permissions": ["read", "runs", "agents", "sessions", "files"],
-        "description": "Can manage agents, runs, and files",
-    },
-    "viewer": {
-        "name": "Viewer",
-        "permissions": ["read"],
-        "description": "Read-only access",
-    },
-}
-_roles_lock = threading.Lock()
-
-# User-role mapping
-_users: Dict[str, Dict[str, Any]] = {}
-_users_lock = threading.Lock()
-
 
 
 def register(app):

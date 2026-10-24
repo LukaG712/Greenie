@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import Depends, HTTPException
 
 from hub import feature_store
-from hub.api.core import _feature_flags, _feature_flags_lock, _message_bus, _message_bus_lock, _verify_token
+from hub.api.core import _message_bus, _message_bus_lock, _verify_token
 
 logger = logging.getLogger(__name__)
 
@@ -172,73 +172,6 @@ async def api_clear_messages(
             total = sum(len(msgs) for msgs in _message_bus.values())
             _message_bus.clear()
             return {"status": "ok", "cleared": total}
-
-
-# ─── Feature Flags ──────────────────────────────────────────────────────────
-
-# Feature flag store: flag_name -> {enabled, description, rules, created_at}
-_feature_flags: Dict[str, Dict[str, Any]] = {}
-_feature_flags_lock = threading.Lock()
-
-# Flag evaluation history
-_flag_evaluations: List[Dict[str, Any]] = []
-_flag_evaluations_lock = threading.Lock()
-
-
-def _evaluate_flag(flag_name: str, context: Optional[Dict[str, Any]] = None) -> bool:
-    """Evaluate a feature flag for the given context."""
-    with _feature_flags_lock:
-        flag = _feature_flags.get(flag_name)
-    if not flag:
-        return False
-
-    # Global override
-    if not flag.get("enabled", True):
-        return False
-
-    context = context or {}
-
-    # Check target rules
-    rules = flag.get("rules", [])
-    if not rules:
-        return True
-
-    for rule in rules:
-        rule_type = rule.get("type", "")
-
-        if rule_type == "user":
-            user_id = context.get("user_id", "")
-            target_users = rule.get("users", [])
-            if target_users and user_id not in target_users:
-                continue
-            return rule.get("enabled", True)
-
-        elif rule_type == "agent":
-            agent_name = context.get("agent", "")
-            target_agents = rule.get("agents", [])
-            if target_agents and agent_name not in target_agents:
-                continue
-            return rule.get("enabled", True)
-
-        elif rule_type == "percentage":
-            import hashlib
-            percentage = rule.get("percentage", 100)
-            identifier = context.get("user_id", context.get("agent", "default"))
-            hash_val = int(hashlib.md5(f"{flag_name}:{identifier}".encode()).hexdigest(), 16)
-            if (hash_val % 100) < percentage:
-                return rule.get("enabled", True)
-            continue
-
-        elif rule_type == "environment":
-            env = context.get("environment", os.environ.get("ENVIRONMENT", "development"))
-            target_envs = rule.get("environments", [])
-            if target_envs and env not in target_envs:
-                continue
-            return rule.get("enabled", True)
-
-    # No matching rule found
-    return flag.get("default_value", False)
-
 
 
 def register(app):

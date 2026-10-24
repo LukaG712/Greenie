@@ -10,19 +10,38 @@ from typing import Any, Dict, List, Optional
 from fastapi import Depends, HTTPException
 
 from hub import feature_store
-from hub.api.core import _analytics, _analytics_lock, _notification_channels, _notification_channels_lock, _verify_token
+from hub.api.core import _notification_channels, _notification_channels_lock, _verify_token
 
 logger = logging.getLogger(__name__)
 
 
-def _send_notification(channel_id: str, message: str) -> None:
-    """Send a notification to a channel."""
-    pass  # Placeholder
+async def _send_notification(channel_id: str, title: str, message: str, level: str = "info") -> bool:
+    """Send a notification to a specific channel."""
+    with _notification_channels_lock:
+        channel = _notification_channels.get(channel_id)
+    if not channel or not channel.get("enabled", True):
+        return False
+
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            payload = {"title": title, "message": message, "level": level}
+            resp = await client.post(channel["webhook_url"], json=payload)
+            return resp.status_code in (200, 201, 204)
+    except Exception:
+        return False
 
 
-def _broadcast_notification(message: str) -> None:
-    """Broadcast a notification to all channels."""
-    pass  # Placeholder
+async def _broadcast_notification(title: str, message: str, level: str = "info") -> list[dict[str, Any]]:
+    """Broadcast a notification to all enabled channels."""
+    with _notification_channels_lock:
+        channels = list(_notification_channels.values())
+
+    results = []
+    for ch in channels:
+        success = await _send_notification(ch["id"], title, message, level)
+        results.append({"channel": ch["id"], "type": ch["type"], "success": success})
+    return results
 
 
 async def api_create_notification_channel(body: Dict[str, Any], _auth: None = Depends(_verify_token)):
@@ -161,75 +180,6 @@ async def api_broadcast_notification(body: Dict[str, Any], _auth: None = Depends
 
     results = await _broadcast_notification(title, message, level)
     return {"results": results}
-
-
-# ─── Analytics & Usage Tracking ─────────────────────────────────────────────
-
-# In-memory analytics store
-_analytics: Dict[str, Any] = {
-    "api_calls": {},           # endpoint -> count
-    "task_durations": [],      # list of (service, duration_ms, status)
-    "runs_by_agent": {},       # agent -> count
-    "errors_by_type": {},      # error_type -> count
-    "daily_stats": {},         # date -> {calls, tasks, errors}
-}
-_analytics_lock = threading.Lock()
-
-
-def _track_api_call(endpoint: str) -> None:
-    """Track an API call for analytics."""
-    with _analytics_lock:
-        _analytics["api_calls"][endpoint] = _analytics["api_calls"].get(endpoint, 0) + 1
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        if today not in _analytics["daily_stats"]:
-            _analytics["daily_stats"][today] = {"calls": 0, "tasks": 0, "errors": 0}
-        _analytics["daily_stats"][today]["calls"] += 1
-    # Persist to database
-    try:
-        feature_store.track_api_call(endpoint)
-        feature_store.update_daily_stats(today, "Greenie", calls=1)
-    except Exception as e:
-        logger.warning(f"Failed to persist analytics: {e}")
-
-
-def _track_task_duration(service: str, duration_ms: float, status: str) -> None:
-    """Track a task's execution duration."""
-    with _analytics_lock:
-        _analytics["task_durations"].append({
-            "service": service,
-            "duration_ms": duration_ms,
-            "status": status,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        })
-        # Keep only last 1000 entries
-        if len(_analytics["task_durations"]) > 1000:
-            _analytics["task_durations"] = _analytics["task_durations"][-1000:]
-        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-        if today not in _analytics["daily_stats"]:
-            _analytics["daily_stats"][today] = {"calls": 0, "tasks": 0, "errors": 0}
-        _analytics["daily_stats"][today]["tasks"] += 1
-        if status == "error":
-            _analytics["daily_stats"][today]["errors"] += 1
-    # Persist to database
-    try:
-        feature_store.track_task_duration(service, duration_ms, status)
-        errors = 1 if status == "error" else 0
-        feature_store.update_daily_stats(today, service, tasks=1, errors=errors)
-    except Exception as e:
-        logger.warning(f"Failed to persist task duration: {e}")
-
-
-def _track_run(agent: str) -> None:
-    """Track a run for analytics."""
-    with _analytics_lock:
-        _analytics["runs_by_agent"][agent] = _analytics["runs_by_agent"].get(agent, 0) + 1
-
-
-def _track_error(error_type: str) -> None:
-    """Track an error for analytics."""
-    with _analytics_lock:
-        _analytics["errors_by_type"][error_type] = _analytics["errors_by_type"].get(error_type, 0) + 1
-
 
 
 def register(app):

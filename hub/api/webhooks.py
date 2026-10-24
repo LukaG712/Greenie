@@ -13,8 +13,6 @@ from fastapi import Depends, HTTPException
 
 from hub import feature_store
 from hub.api.core import (
-    _notification_channels,
-    _notification_channels_lock,
     _scheduled_reports,
     _scheduled_reports_lock,
     _verify_token,
@@ -200,67 +198,6 @@ async def api_list_event_types(_auth: None = Depends(_verify_token)):
     return {"event_types": list(_EVENT_TYPES)}
 
 
-# ─── Notification Channels ──────────────────────────────────────────────────
-
-# In-memory notification channel registry
-_notification_channels: Dict[str, Dict[str, Any]] = {}
-_notification_channels_lock = threading.Lock()
-
-
-async def _send_notification(channel_id: str, title: str, message: str, level: str = "info") -> bool:
-    """Send a notification to a specific channel."""
-    import httpx
-
-    with _notification_channels_lock:
-        channel = _notification_channels.get(channel_id)
-    if not channel or not channel.get("enabled", True):
-        return False
-
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            ch_type = channel.get("type", "").lower()
-
-            if ch_type == "slack":
-                payload = {"text": f"*{title}*\n{message}"}
-                if level == "error":
-                    payload["attachments"] = [{"color": "danger", "text": message}]
-                elif level == "warning":
-                    payload["attachments"] = [{"color": "warning", "text": message}]
-                resp = await client.post(channel["webhook_url"], json=payload)
-            elif ch_type == "discord":
-                payload = {
-                    "content": None,
-                    "embeds": [{
-                        "title": title,
-                        "description": message[:2000],
-                        "color": {"error": 0xFF0000, "warning": 0xFFAA00, "success": 0x00FF00}.get(level, 0x0099FF),
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                    }],
-                }
-                resp = await client.post(channel["webhook_url"], json=payload)
-            elif ch_type == "generic":
-                payload = {"title": title, "message": message, "level": level, "timestamp": datetime.now(timezone.utc).isoformat()}
-                resp = await client.post(channel["webhook_url"], json=payload)
-            else:
-                return False
-
-            return resp.status_code in (200, 201, 204)
-    except Exception:
-        return False
-
-
-async def _broadcast_notification(title: str, message: str, level: str = "info") -> List[Dict[str, Any]]:
-    """Broadcast a notification to all enabled channels."""
-    with _notification_channels_lock:
-        channels = list(_notification_channels.values())
-
-    results = []
-    for ch in channels:
-        success = await _send_notification(ch["id"], title, message, level)
-        results.append({"channel": ch["id"], "type": ch["type"], "success": success})
-    return results
-
-
 async def api_list_webhook_configs(_auth: None = Depends(_verify_token)):
     """List all webhook configurations (secrets redacted)."""
     with _webhook_secrets_lock:
@@ -271,13 +208,6 @@ async def api_list_webhook_configs(_auth: None = Depends(_verify_token)):
                 "has_secret": bool(cfg.get("secret")),
             }
     return configs
-
-
-# ─── Scheduled Reports Endpoints ─────────────────────────────────────────────
-
-# In-memory store for scheduled reports
-_scheduled_reports: Dict[str, Dict[str, Any]] = {}
-_scheduled_reports_lock = threading.Lock()
 
 
 

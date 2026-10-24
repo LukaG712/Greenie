@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import Depends, HTTPException
 
 from hub import feature_store
-from hub.api.core import _audit_log, _audit_log_lock, _rate_limits, _rate_limits_lock, _verify_token
+from hub.api.core import _rate_limits, _rate_limits_lock, _verify_token
 
 logger = logging.getLogger(__name__)
 
@@ -83,38 +83,6 @@ async def api_delete_rate_limit(key_id: str, _auth: None = Depends(_verify_token
             raise HTTPException(status_code=404, detail="Rate limit not found")
         del _rate_limits[key_id]
     return {"status": "ok", "message": "Rate limit removed, reverted to default"}
-
-
-# ─── Audit Log ──────────────────────────────────────────────────────────────
-
-# In-memory audit log (bounded)
-_audit_log: List[Dict[str, Any]] = []
-_audit_log_lock = threading.Lock()
-_MAX_AUDIT_ENTRIES = 5000
-
-
-def _audit(action: str, actor: str, resource: str, detail: str = "", ip: str = "") -> None:
-    """Append an entry to the audit log."""
-    entry = {
-        "id": f"audit-{uuid.uuid4().hex[:8]}",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "action": action,
-        "actor": actor,
-        "resource": resource,
-        "detail": detail,
-        "ip": ip,
-    }
-    with _audit_log_lock:
-        _audit_log.append(entry)
-        # Bounded: keep last N entries
-        if len(_audit_log) > _MAX_AUDIT_ENTRIES:
-            _audit_log.pop(0)
-    # Persist to database
-    try:
-        feature_store.log_audit(action, resource, actor=actor, details=detail, ip_address=ip)
-    except Exception as e:
-        logger.warning(f"Failed to persist audit log: {e}")
-
 
 
 def register(app):

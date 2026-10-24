@@ -12,7 +12,7 @@ from fastapi import Depends, HTTPException
 
 from hub import feature_store
 from hub.api.core import _tenant_resources, _tenant_resources_lock, _tenants, _tenants_lock, _verify_token
-from hub.runner import Run, agent_status, get_run, list_runs, recover_stale_runs, run_agent, stop_run
+from hub.runner import run_agent
 
 logger = logging.getLogger(__name__)
 
@@ -260,21 +260,6 @@ async def api_list_dag_executions(limit: int = 20, _auth: None = Depends(_verify
     executions.reverse()
 
     return {"executions": executions, "count": len(executions)}
-
-
-# ─── Multi-Tenancy / Workspace Isolation ────────────────────────────────────
-
-# Tenant registry
-_tenants: Dict[str, Dict[str, Any]] = {}
-_tenants_lock = threading.Lock()
-
-# Tenant -> resource mapping (which agents/runs belong to which tenant)
-_tenant_resources: Dict[str, List[str]] = {}
-_tenant_resources_lock = threading.Lock()
-
-# Default tenant
-_DEFAULT_TENANT = "default"
-
 
 
 def register(app):
