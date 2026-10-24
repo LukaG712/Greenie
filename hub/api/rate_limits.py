@@ -48,7 +48,7 @@ async def api_create_rate_limit(body: Dict[str, Any], _auth: None = Depends(_ver
         _rate_limits[key_id] = {
             "requests": requests,
             "window": window,
-            "created_at": datetime.now().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
         }
     # Persist to database
     try:
@@ -97,7 +97,7 @@ def _audit(action: str, actor: str, resource: str, detail: str = "", ip: str = "
     """Append an entry to the audit log."""
     entry = {
         "id": f"audit-{uuid.uuid4().hex[:8]}",
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "action": action,
         "actor": actor,
         "resource": resource,

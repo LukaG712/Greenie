@@ -48,7 +48,7 @@ async def api_create_tenant(body: Dict[str, Any], _auth: None = Depends(_verify_
         "description": body.get("description", ""),
         "limits": body.get("limits", {}),
         "allowed_services": body.get("allowed_services", ["Trapper", "Slinker", "agent"]),
-        "created_at": datetime.now().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
         "active": True,
         "resource_count": 0,
     }

@@ -68,7 +68,7 @@ async def api_create_role(body: Dict[str, Any], _auth: None = Depends(_verify_to
         "name": role_name,
         "permissions": permissions,
         "description": body.get("description", ""),
-        "created_at": datetime.now().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
     }
 
     with _roles_lock:
@@ -165,7 +165,7 @@ async def api_create_user(body: Dict[str, Any], _auth: None = Depends(_verify_to
         "api_key": body.get("api_key", ""),
         "email": body.get("email", ""),
         "active": True,
-        "created_at": datetime.now().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
         "last_login": None,
     }
 
@@ -298,7 +298,7 @@ async def _job_worker():
                     if job and job["state"] == JOB_PENDING:
                         job_id = jid
                         job["state"] = JOB_RUNNING
-                        job["started_at"] = datetime.now().isoformat()
+                        job["started_at"] = datetime.now(timezone.utc).isoformat()
                         break
 
         if job_id:
@@ -364,7 +364,7 @@ async def _process_job(job_id: str):
 
         with _job_queue_lock:
             job["state"] = JOB_COMPLETED
-            job["completed_at"] = datetime.now().isoformat()
+            job["completed_at"] = datetime.now(timezone.utc).isoformat()
 
         _emit_event("job.completed", {"job_id": job_id, "type": task_type})
 
@@ -395,7 +395,7 @@ def _handle_job_failure(job_id: str, error: str):
         else:
             job["state"] = JOB_DEAD
             job["last_error"] = error
-            job["failed_at"] = datetime.now().isoformat()
+            job["failed_at"] = datetime.now(timezone.utc).isoformat()
 
             # Move to dead letter queue
             with _dead_letter_lock:

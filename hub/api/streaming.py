@@ -256,7 +256,7 @@ async def _scheduled_pipeline_runner(pipeline_id: str):
     run_count = 0
 
     while True:
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         if _cron_simple_match(cron_expr, now):
             with _scheduled_pipelines_lock:
                 pipeline = _scheduled_pipelines.get(pipeline_id)

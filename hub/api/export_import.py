@@ -63,7 +63,7 @@ async def api_export_sessions(
                 writer.writerow(flat)
         return {
             "content_type": "text/csv",
-            "filename": f"sessions_{datetime.now().strftime('%Y%m%d')}.csv",
+            "filename": f"sessions_{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv",
             "data": output.getvalue(),
         }
     else:
@@ -103,7 +103,7 @@ async def api_export_runs(
                 writer.writerow(flat)
         return {
             "content_type": "text/csv",
-            "filename": f"runs_{datetime.now().strftime('%Y%m%d')}.csv",
+            "filename": f"runs_{datetime.now(timezone.utc).strftime('%Y%m%d')}.csv",
             "data": output.getvalue(),
         }
     else:
@@ -194,7 +194,7 @@ def _verify_token_multi(
             if key_data.get("expires_at"):
                 try:
                     expires = datetime.fromisoformat(key_data["expires_at"])
-                    if expires < datetime.now():
+                    if expires < datetime.now(timezone.utc):
                         raise HTTPException(status_code=401, detail="API key has expired")
                 except (ValueError, TypeError):
                     pass

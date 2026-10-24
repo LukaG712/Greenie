@@ -45,7 +45,7 @@ async def api_create_deployment(body: Dict[str, Any], _auth: None = Depends(_ver
         "deployer": body.get("deployer", "manual"),
         "notes": body.get("notes", ""),
         "status": "deploying",  # deploying, deployed, rolled_back
-        "started_at": datetime.now().isoformat(),
+        "started_at": datetime.now(timezone.utc).isoformat(),
         "completed_at": None,
         "duration_seconds": None,
     }
@@ -105,7 +105,7 @@ async def api_complete_deployment(deployment_id: str, _auth: None = Depends(_ver
             raise HTTPException(status_code=400, detail=f"Deployment is {deployment['status']}")
 
         deployment["status"] = "deployed"
-        deployment["completed_at"] = datetime.now().isoformat()
+        deployment["completed_at"] = datetime.now(timezone.utc).isoformat()
         start = datetime.fromisoformat(deployment["started_at"])
         end = datetime.fromisoformat(deployment["completed_at"])
         deployment["duration_seconds"] = (end - start).total_seconds()
@@ -131,7 +131,7 @@ async def api_rollback_deployment(deployment_id: str, _auth: None = Depends(_ver
             raise HTTPException(status_code=404, detail="Deployment not found")
 
         deployment["status"] = "rolled_back"
-        deployment["completed_at"] = datetime.now().isoformat()
+        deployment["completed_at"] = datetime.now(timezone.utc).isoformat()
         start = datetime.fromisoformat(deployment["started_at"])
         end = datetime.fromisoformat(deployment["completed_at"])
         deployment["duration_seconds"] = (end - start).total_seconds()
@@ -162,7 +162,7 @@ async def api_deployment_stats(_auth: None = Depends(_verify_token)):
         "by_environment": dict(by_env),
         "by_status": dict(by_status),
         "avg_duration_seconds": round(avg_duration, 2),
-        "last_30_days": len([d for d in deployments if (datetime.now() - datetime.fromisoformat(d["started_at"])).days < 30]),
+        "last_30_days": len([d for d in deployments if (datetime.now(timezone.utc) - datetime.fromisoformat(d["started_at"])).days < 30]),
     }
 
 
@@ -188,7 +188,7 @@ def _get_circuit_state(service: str) -> Dict[str, Any]:
                 "failure_count": 0,
                 "success_count": 0,
                 "last_failure_at": None,
-                "last_state_change": datetime.now().isoformat(),
+                "last_state_change": datetime.now(timezone.utc).isoformat(),
                 "failure_threshold": _CB_DEFAULT_FAILURE_THRESHOLD,
                 "recovery_timeout": _CB_DEFAULT_RECOVERY_TIMEOUT,
                 "success_threshold": _CB_DEFAULT_SUCCESS_THRESHOLD,
@@ -211,7 +211,7 @@ def _record_success(service: str) -> str:
                 cb["state"] = "closed"
                 cb["failure_count"] = 0
                 cb["success_count"] = 0
-                cb["last_state_change"] = datetime.now().isoformat()
+                cb["last_state_change"] = datetime.now(timezone.utc).isoformat()
         elif cb["state"] == "closed":
             cb["failure_count"] = max(0, cb["failure_count"] - 1)
         return cb["state"]
@@ -222,14 +222,14 @@ def _record_failure(service: str) -> str:
     cb = _get_circuit_state(service)
     with _circuit_breakers_lock:
         cb["failure_count"] += 1
-        cb["last_failure_at"] = datetime.now().isoformat()
+        cb["last_failure_at"] = datetime.now(timezone.utc).isoformat()
 
         if cb["state"] == "half-open":
             cb["state"] = "open"
-            cb["last_state_change"] = datetime.now().isoformat()
+            cb["last_state_change"] = datetime.now(timezone.utc).isoformat()
         elif cb["state"] == "closed" and cb["failure_count"] >= cb["failure_threshold"]:
             cb["state"] = "open"
-            cb["last_state_change"] = datetime.now().isoformat()
+            cb["last_state_change"] = datetime.now(timezone.utc).isoformat()
 
         return cb["state"]
 
@@ -242,12 +242,12 @@ def _can_execute(service: str) -> bool:
     if cb["state"] == "open":
         # Check if recovery timeout has elapsed
         last_change = datetime.fromisoformat(cb["last_state_change"])
-        elapsed = (datetime.now() - last_change).total_seconds()
+        elapsed = (datetime.now(timezone.utc) - last_change).total_seconds()
         if elapsed >= cb["recovery_timeout"]:
             with _circuit_breakers_lock:
                 cb["state"] = "half-open"
                 cb["success_count"] = 0
-                cb["last_state_change"] = datetime.now().isoformat()
+                cb["last_state_change"] = datetime.now(timezone.utc).isoformat()
             return True
         return False
     # half-open: allow limited calls

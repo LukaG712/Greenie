@@ -267,7 +267,7 @@ class CronExpression:
             The next datetime that matches this expression
         """
         if after is None:
-            after = datetime.now()
+            after = datetime.now(timezone.utc)
         
         # Start from the next minute
         dt = after.replace(second=0, microsecond=0) + timedelta(minutes=1)

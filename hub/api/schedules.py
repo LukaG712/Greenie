@@ -64,7 +64,7 @@ async def api_create_schedule(body: Dict[str, Any], _auth: None = Depends(_verif
         "schedule": schedule,
         "steps": steps,
         "enabled": body.get("enabled", True),
-        "created_at": datetime.now().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
         "run_count": 0,
         "last_run": None,
         "last_result": None,

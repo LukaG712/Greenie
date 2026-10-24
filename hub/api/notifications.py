@@ -54,7 +54,7 @@ async def api_create_notification_channel(body: Dict[str, Any], _auth: None = De
         "type": ch_type,
         "webhook_url": webhook_url,
         "enabled": body.get("enabled", True),
-        "created_at": datetime.now().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
     }
 
     with _notification_channels_lock:
@@ -180,7 +180,7 @@ def _track_api_call(endpoint: str) -> None:
     """Track an API call for analytics."""
     with _analytics_lock:
         _analytics["api_calls"][endpoint] = _analytics["api_calls"].get(endpoint, 0) + 1
-        today = datetime.now().strftime("%Y-%m-%d")
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         if today not in _analytics["daily_stats"]:
             _analytics["daily_stats"][today] = {"calls": 0, "tasks": 0, "errors": 0}
         _analytics["daily_stats"][today]["calls"] += 1
@@ -199,12 +199,12 @@ def _track_task_duration(service: str, duration_ms: float, status: str) -> None:
             "service": service,
             "duration_ms": duration_ms,
             "status": status,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         })
         # Keep only last 1000 entries
         if len(_analytics["task_durations"]) > 1000:
             _analytics["task_durations"] = _analytics["task_durations"][-1000:]
-        today = datetime.now().strftime("%Y-%m-%d")
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
         if today not in _analytics["daily_stats"]:
             _analytics["daily_stats"][today] = {"calls": 0, "tasks": 0, "errors": 0}
         _analytics["daily_stats"][today]["tasks"] += 1

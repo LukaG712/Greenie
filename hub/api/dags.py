@@ -83,7 +83,7 @@ async def api_create_dag(body: Dict[str, Any], _auth: None = Depends(_verify_tok
         "id": dag_id,
         "name": name,
         "tasks": tasks,
-        "created_at": datetime.now().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
         "execution_count": 0,
     }
 
@@ -232,7 +232,7 @@ async def api_execute_dag(dag_id: str, _auth: None = Depends(_verify_token)):
         "dag_name": dag["name"],
         "results": results,
         "errors": errors,
-        "started_at": datetime.now().isoformat(),
+        "started_at": datetime.now(timezone.utc).isoformat(),
         "succeeded": len(errors) == 0,
     }
 

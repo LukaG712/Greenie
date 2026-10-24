@@ -47,7 +47,7 @@ async def api_create_scheduled_report(request: Request, _auth: None = Depends(_v
         "last_run": None,
         "last_result": None,
         "run_count": 0,
-        "created_at": datetime.now().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
     }
     
     with _scheduled_reports_lock:
@@ -100,7 +100,7 @@ async def api_update_scheduled_report(report_id: str, request: Request, _auth: N
             report["config"] = body["config"]
         if "enabled" in body:
             report["enabled"] = body["enabled"]
-        report["updated_at"] = datetime.now().isoformat()
+        report["updated_at"] = datetime.now(timezone.utc).isoformat()
     
     # Persist to database
     try:
@@ -142,7 +142,7 @@ async def api_run_report_now(report_id: str, _auth: None = Depends(_verify_token
     
     # Update report stats
     with _scheduled_reports_lock:
-        report["last_run"] = datetime.now().isoformat()
+        report["last_run"] = datetime.now(timezone.utc).isoformat()
         report["last_result"] = {"status": "ok", "format": report_format}
         report["run_count"] = report.get("run_count", 0) + 1
     

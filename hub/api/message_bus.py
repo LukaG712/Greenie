@@ -26,7 +26,7 @@ async def _publish_message(topic: str, payload: Dict[str, Any]) -> Dict[str, Any
         "id": f"msg-{uuid.uuid4().hex[:8]}",
         "topic": topic,
         "payload": payload,
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
     with _message_bus_lock:
         if topic not in _message_bus:
@@ -113,7 +113,7 @@ async def api_subscribe_topic(body: Dict[str, Any], _auth: None = Depends(_verif
         "id": subscriber_id,
         "topic": topic,
         "url": webhook_url,
-        "created_at": datetime.now().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
         "delivery_count": 0,
     }
 

@@ -123,7 +123,7 @@ async def api_upload_file(request: Request, _auth: None = Depends(_verify_token)
         "content_type": request.headers.get("content-type", "application/octet-stream"),
         "run_id": run_id,
         "description": description,
-        "uploaded_at": datetime.now().isoformat(),
+        "uploaded_at": datetime.now(timezone.utc).isoformat(),
     }
 
     with _file_store_lock:

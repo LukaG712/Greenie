@@ -49,7 +49,7 @@ async def api_list_approvals(
         approvals = [a for a in approvals if a.get("agent") == agent or a.get("bot_id") == agent]
 
     # Check for expired approvals
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
     for a in approvals:
         if a.get("status") == "pending":
             created_str = a.get("created_at", "")
@@ -81,7 +81,7 @@ async def api_approve(approval_id: str, body: Optional[Dict[str, Any]] = None, _
             raise HTTPException(status_code=400, detail=f"Approval is {approval['status']}")
 
         approval["status"] = "approved"
-        approval["resolved_at"] = datetime.now().isoformat()
+        approval["resolved_at"] = datetime.now(timezone.utc).isoformat()
         approval["resolved_by"] = body.get("user", "api")
         approval["notes"] = body.get("notes", "")
 
@@ -109,7 +109,7 @@ async def api_deny(approval_id: str, body: Optional[Dict[str, Any]] = None, _aut
             raise HTTPException(status_code=400, detail=f"Approval is {approval['status']}")
 
         approval["status"] = "denied"
-        approval["resolved_at"] = datetime.now().isoformat()
+        approval["resolved_at"] = datetime.now(timezone.utc).isoformat()
         approval["resolved_by"] = body.get("user", "api")
         approval["notes"] = body.get("notes", "")
 
@@ -158,7 +158,7 @@ async def api_request_approval(body: Dict[str, Any], _auth: None = Depends(_veri
         "agent": body.get("agent", ""),
         "details": body.get("details", {}),
         "status": "pending",
-        "created_at": datetime.now().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
         "resolved_at": None,
         "resolved_by": None,
         "timeout_minutes": body.get("timeout_minutes", 30),

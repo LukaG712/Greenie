@@ -40,7 +40,7 @@ async def api_create_api_key(body: Dict[str, Any], _auth: None = Depends(_verify
     expires_at = None
     if expires_in_days:
         from datetime import timedelta
-        expires_at = (datetime.now() + timedelta(days=expires_in_days)).isoformat()
+        expires_at = (datetime.now(timezone.utc) + timedelta(days=expires_in_days)).isoformat()
 
     key_id = f"key-{uuid.uuid4().hex[:8]}"
     key_data = {
@@ -50,7 +50,7 @@ async def api_create_api_key(body: Dict[str, Any], _auth: None = Depends(_verify
         "permissions": permissions,
         "active": True,
         "expires_at": expires_at,
-        "created_at": datetime.now().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
         "last_used": None,
         "usage_count": 0,
     }
@@ -146,7 +146,7 @@ async def api_rotate_api_key(key_id: str, _auth: None = Depends(_verify_token)):
         # Generate new key
         new_key = uuid.uuid4().hex + uuid.uuid4().hex[:16]
         key_data["key"] = new_key
-        key_data["rotated_at"] = datetime.now().isoformat()
+        key_data["rotated_at"] = datetime.now(timezone.utc).isoformat()
         key_data["usage_count"] = 0
         key_data["last_used"] = None
 

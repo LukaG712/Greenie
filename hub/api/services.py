@@ -30,7 +30,7 @@ async def api_services_status(_auth: None = Depends(_verify_token)):
                     "url": url,
                     "status": status,
                     "response_time_ms": round(resp.elapsed.total_seconds() * 1000, 2),
-                    "last_check": datetime.now().isoformat(),
+                    "last_check": datetime.now(timezone.utc).isoformat(),
                 }
         except Exception as e:
             return {
@@ -38,7 +38,7 @@ async def api_services_status(_auth: None = Depends(_verify_token)):
                 "url": url,
                 "status": "unreachable",
                 "error": str(e),
-                "last_check": datetime.now().isoformat(),
+                "last_check": datetime.now(timezone.utc).isoformat(),
             }
 
     Slinker_url = os.environ.get("Slinker_URL", "http://localhost:8000").rstrip("/")
@@ -66,7 +66,7 @@ async def api_services_status(_auth: None = Depends(_verify_token)):
                 "name": "Greenie",
                 "status": "healthy",
                 "version": "1.0.3",
-                "last_check": datetime.now().isoformat(),
+                "last_check": datetime.now(timezone.utc).isoformat(),
             },
             "Slinker": Slinker_status,
             "Trapper": Trapper_status,

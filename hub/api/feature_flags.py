@@ -64,8 +64,8 @@ async def api_create_feature_flag(body: Dict[str, Any], _auth: None = Depends(_v
         "enabled": body.get("enabled", True),
         "rules": body.get("rules", []),
         "default_value": body.get("default_value", False),
-        "created_at": datetime.now().isoformat(),
-        "updated_at": datetime.now().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
     }
 
     with _feature_flags_lock:
@@ -109,7 +109,7 @@ async def api_update_feature_flag(flag_name: str, body: Dict[str, Any], _auth: N
             flag["rules"] = body["rules"]
         if "default_value" in body:
             flag["default_value"] = body["default_value"]
-        flag["updated_at"] = datetime.now().isoformat()
+        flag["updated_at"] = datetime.now(timezone.utc).isoformat()
     # Persist to database
     try:
         feature_store.save_feature_flag(flag)
@@ -154,7 +154,7 @@ async def api_evaluate_feature_flag(
         "flag": flag_name,
         "context": context,
         "result": result,
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
     with _flag_evaluations_lock:
         _flag_evaluations.append(eval_entry)

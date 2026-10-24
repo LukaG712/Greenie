@@ -107,7 +107,7 @@ async def api_restore_backup(backup_file: str, _auth: None = Depends(_verify_tok
 
     # Create a safety backup of the current database before restoring
     if target_db.exists():
-        safety_backup = _BACKUP_DIR / f"hub_pre_restore_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
+        safety_backup = _BACKUP_DIR / f"hub_pre_restore_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.db"
         try:
             shutil.copy2(str(target_db), str(safety_backup))
             logger.info(f"Safety backup created: {safety_backup.name}")
@@ -129,7 +129,7 @@ async def api_restore_backup(backup_file: str, _auth: None = Depends(_verify_tok
         return {
             "status": "ok",
             "message": f"Database restored from {backup_file}",
-            "restored_at": datetime.now().isoformat(),
+            "restored_at": datetime.now(timezone.utc).isoformat(),
         }
     except Exception as e:
         logger.error(f"Restore failed: {e}")

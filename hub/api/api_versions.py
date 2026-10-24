@@ -46,7 +46,7 @@ async def api_create_version(body: Dict[str, Any], _auth: None = Depends(_verify
     version_data = {
         "version": version,
         "status": status,
-        "release_date": body.get("release_date", datetime.now().strftime("%Y-%m-%d")),
+        "release_date": body.get("release_date", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
         "deprecation_date": body.get("deprecation_date"),
         "sunset_date": body.get("sunset_date"),
         "description": body.get("description", ""),
@@ -77,7 +77,7 @@ async def api_deprecate_version(version: str, body: Dict[str, Any], _auth: None 
         if version not in _api_versions:
             raise HTTPException(status_code=404, detail="Version not found")
         _api_versions[version]["status"] = "deprecated"
-        _api_versions[version]["deprecation_date"] = body.get("deprecation_date", datetime.now().strftime("%Y-%m-%d"))
+        _api_versions[version]["deprecation_date"] = body.get("deprecation_date", datetime.now(timezone.utc).strftime("%Y-%m-%d"))
         if "sunset_date" in body:
             _api_versions[version]["sunset_date"] = body["sunset_date"]
         if "migration_guide" in body:
@@ -112,7 +112,7 @@ async def api_register_deprecated_endpoint(body: Dict[str, Any], _auth: None = D
         "new_path": new_path,
         "message": body.get("message", f"Use {new_path} instead"),
         "version": body.get("version", ""),
-        "registered_at": datetime.now().isoformat(),
+        "registered_at": datetime.now(timezone.utc).isoformat(),
     }
 
     with _deprecated_endpoints_lock:

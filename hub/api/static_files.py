@@ -76,7 +76,7 @@ def _emit_event(event_type: str, data: Dict[str, Any]) -> None:
             ]
         payload = {
             "event": event_type,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "data": data,
         }
         async with httpx.AsyncClient(timeout=10.0) as client:

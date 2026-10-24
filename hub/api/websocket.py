@@ -92,7 +92,7 @@ async def websocket_endpoint(ws: WebSocket, channel: str = "all", token: str = "
         await ws.send(json.dumps({
             "event": "connected",
             "channel": channel,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
         }))
 
         # Keep alive loop
@@ -100,7 +100,7 @@ async def websocket_endpoint(ws: WebSocket, channel: str = "all", token: str = "
             data = await ws.receive_text()
             # Handle client messages (e.g., ping)
             if data == "ping":
-                await ws.send(json.dumps({"event": "pong", "timestamp": datetime.now().isoformat()}))
+                await ws.send(json.dumps({"event": "pong", "timestamp": datetime.now(timezone.utc).isoformat()}))
     except WebSocketDisconnect:
         pass
     except Exception:

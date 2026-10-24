@@ -84,8 +84,8 @@ async def api_create_template(body: Dict[str, Any], _auth: None = Depends(_verif
         "steps": body.get("steps", []),
         "variables": body.get("variables", []),
         "tags": body.get("tags", []),
-        "created_at": datetime.now().isoformat(),
-        "updated_at": datetime.now().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
         "usage_count": 0,
     }
 
@@ -139,7 +139,7 @@ async def api_update_template(template_id: str, body: Dict[str, Any], _auth: Non
             template["variables"] = body["variables"]
         if "tags" in body:
             template["tags"] = body["tags"]
-        template["updated_at"] = datetime.now().isoformat()
+        template["updated_at"] = datetime.now(timezone.utc).isoformat()
     # Persist to database
     try:
         feature_store.save_template(template)

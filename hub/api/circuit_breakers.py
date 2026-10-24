@@ -29,7 +29,7 @@ def _get_circuit_state(service: str) -> Dict[str, Any]:
                 "failure_count": 0,
                 "success_count": 0,
                 "last_failure_at": None,
-                "last_state_change": datetime.now().isoformat(),
+                "last_state_change": datetime.now(timezone.utc).isoformat(),
                 "failure_threshold": _CB_DEFAULT_FAILURE_THRESHOLD,
                 "recovery_timeout": _CB_DEFAULT_RECOVERY_TIMEOUT,
                 "success_threshold": _CB_DEFAULT_SUCCESS_THRESHOLD,
@@ -48,7 +48,7 @@ def _record_success(service: str) -> str:
             cb["state"] = "closed"
             cb["failure_count"] = 0
             cb["success_count"] = 0
-            cb["last_state_change"] = datetime.now().isoformat()
+            cb["last_state_change"] = datetime.now(timezone.utc).isoformat()
         return cb["state"]
 
 
@@ -59,10 +59,10 @@ def _record_failure(service: str) -> str:
         if not cb:
             return "closed"
         cb["failure_count"] += 1
-        cb["last_failure_at"] = datetime.now().isoformat()
+        cb["last_failure_at"] = datetime.now(timezone.utc).isoformat()
         if cb["failure_count"] >= cb.get("failure_threshold", 5):
             cb["state"] = "open"
-            cb["last_state_change"] = datetime.now().isoformat()
+            cb["last_state_change"] = datetime.now(timezone.utc).isoformat()
         return cb["state"]
 
 
@@ -142,7 +142,7 @@ async def api_reset_circuit_breaker(service: str, _auth: None = Depends(_verify_
             "failure_count": 0,
             "success_count": 0,
             "last_failure_at": None,
-            "last_state_change": datetime.now().isoformat(),
+            "last_state_change": datetime.now(timezone.utc).isoformat(),
             "failure_threshold": _CB_DEFAULT_FAILURE_THRESHOLD,
             "recovery_timeout": _CB_DEFAULT_RECOVERY_TIMEOUT,
             "success_threshold": _CB_DEFAULT_SUCCESS_THRESHOLD,

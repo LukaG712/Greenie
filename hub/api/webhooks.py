@@ -74,7 +74,7 @@ async def api_create_webhook(body: Dict[str, Any], _auth: None = Depends(_verify
         "events": events,
         "secret": body.get("secret", ""),
         "enabled": body.get("enabled", True),
-        "created_at": datetime.now().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
         "delivery_count": 0,
         "last_delivery": None,
         "last_error": None,
@@ -168,7 +168,7 @@ async def api_test_webhook(webhook_id: str, _auth: None = Depends(_verify_token)
 
     test_payload = {
         "event": "webhook.test",
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "data": {"message": "This is a test webhook delivery", "webhook_id": webhook_id},
     }
 
@@ -234,12 +234,12 @@ async def _send_notification(channel_id: str, title: str, message: str, level: s
                         "title": title,
                         "description": message[:2000],
                         "color": {"error": 0xFF0000, "warning": 0xFFAA00, "success": 0x00FF00}.get(level, 0x0099FF),
-                        "timestamp": datetime.now().isoformat(),
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
                     }],
                 }
                 resp = await client.post(channel["webhook_url"], json=payload)
             elif ch_type == "generic":
-                payload = {"title": title, "message": message, "level": level, "timestamp": datetime.now().isoformat()}
+                payload = {"title": title, "message": message, "level": level, "timestamp": datetime.now(timezone.utc).isoformat()}
                 resp = await client.post(channel["webhook_url"], json=payload)
             else:
                 return False

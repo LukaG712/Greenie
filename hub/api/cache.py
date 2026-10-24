@@ -135,7 +135,7 @@ async def _publish_message(topic: str, payload: Dict[str, Any]) -> Dict[str, Any
         "id": f"msg-{uuid.uuid4().hex[:8]}",
         "topic": topic,
         "payload": payload,
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
     with _message_bus_lock:

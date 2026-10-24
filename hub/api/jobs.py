@@ -61,7 +61,7 @@ async def _job_worker() -> None:
             if not job or job["state"] != JOB_PENDING:
                 continue
             job["state"] = JOB_RUNNING
-            job["started_at"] = datetime.now().isoformat()
+            job["started_at"] = datetime.now(timezone.utc).isoformat()
         
         try:
             # Process job based on type
@@ -76,7 +76,7 @@ async def _job_worker() -> None:
                     job["result"] = {"run_id": run.id, "answer": run.answer}
             
             job["state"] = JOB_COMPLETED
-            job["completed_at"] = datetime.now().isoformat()
+            job["completed_at"] = datetime.now(timezone.utc).isoformat()
         except Exception as e:
             job["retries"] = job.get("retries", 0) + 1
             job["last_error"] = str(e)
@@ -124,7 +124,7 @@ async def api_submit_job(body: Dict[str, Any], _auth: None = Depends(_verify_tok
         "max_retries": body.get("max_retries", 3),
         "retries": 0,
         "metadata": body.get("metadata", {}),
-        "created_at": datetime.now().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
         "started_at": None,
         "completed_at": None,
         "result": None,
@@ -186,7 +186,7 @@ async def api_cancel_job(job_id: str, _auth: None = Depends(_verify_token)):
         if job["state"] in (JOB_RUNNING, JOB_COMPLETED):
             raise HTTPException(status_code=400, detail=f"Cannot cancel job in {job['state']} state")
         job["state"] = "cancelled"
-        job["cancelled_at"] = datetime.now().isoformat()
+        job["cancelled_at"] = datetime.now(timezone.utc).isoformat()
 
     with _job_order_lock:
         if job_id in _job_order:
@@ -253,7 +253,7 @@ async def api_replay_dead_letter(job_id: str, _auth: None = Depends(_verify_toke
         "max_retries": job.get("max_retries", 3),
         "retries": 0,
         "metadata": {**job.get("metadata", {}), "replayed_from": job_id},
-        "created_at": datetime.now().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
         "started_at": None,
         "completed_at": None,
         "result": None,
@@ -344,7 +344,7 @@ def _set_cached(key: str, data: Any, ttl: int = 60) -> None:
         _response_cache[key] = {
             "data": data,
             "expires_at": now + ttl,
-            "created_at": datetime.now().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
             "hits": 0,
         }
         # Evict expired entries if cache grows too large
