@@ -46,6 +46,8 @@ class WorkflowExecutor:
         # Pending approvals: run_id -> event for resuming
         self._pending_events: dict[str, asyncio.Event] = {}
         self._pending_results: dict[str, str] = {}  # run_id -> "approved" | "denied"
+        # Background tasks for workflow execution
+        self._background_tasks: set[asyncio.Task] = set()
 
     async def execute(
         self,
@@ -84,8 +86,10 @@ class WorkflowExecutor:
         storage.save_workflow_run(run)
         logger.info(f"Workflow run started: {run.id} for workflow {workflow.id}")
 
-        # Execute in background
-        asyncio.create_task(self._run_steps(workflow, run))
+        # Execute in background - store task reference to prevent silent failures
+        task = asyncio.create_task(self._run_steps(workflow, run))
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
         return run
 
     async def _run_steps(self, workflow: WorkflowDefinition, run: WorkflowRun) -> None:

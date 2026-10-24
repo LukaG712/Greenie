@@ -214,12 +214,15 @@ class RemoteTarget:
 
         # Transfer and extract via SSH
         try:
+            import shlex
+            # Escape remote_dir to prevent shell injection
+            safe_remote_dir = shlex.quote(remote_dir)
             # Create remote directory
-            self._run_ssh(f"mkdir -p {remote_dir}", timeout=30)
+            self._run_ssh(f"mkdir -p {safe_remote_dir}", timeout=30)
 
             # Transfer tarball and extract
             remote_addr = f"{self.config.user}@{self.config.host}"
-            ssh_args = self._ssh_args() + [remote_addr, f"cd {remote_dir} && tar xzf -"]
+            ssh_args = self._ssh_args() + [remote_addr, f"cd {safe_remote_dir} && tar xzf -"]
 
             proc = subprocess.run(
                 ssh_args,
