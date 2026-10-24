@@ -26,8 +26,8 @@ async def api_dashboard(_auth: None = Depends(_verify_token)):
     import httpx
 
     async def _Slinker_dashboard():
-        base_url = os.environ.get("Slinker_URL", "http://localhost:8000").rstrip("/")
-        api_key = os.environ.get("Slinker_API_KEY", "")
+        base_url = os.environ.get("SLINKER_URL", "http://localhost:8000").rstrip("/")
+        api_key = os.environ.get("SLINKER_API_KEY", "")
         headers = {}
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
@@ -49,7 +49,7 @@ async def api_dashboard(_auth: None = Depends(_verify_token)):
             return {"health": "unreachable", "error": str(e)}
 
     async def _Trapper_dashboard():
-        base_url = os.environ.get("Trapper_URL", "http://localhost:3000").rstrip("/")
+        base_url = os.environ.get("TRAPPER_URL", "http://localhost:3000").rstrip("/")
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
                 resp = await client.get(f"{base_url}/health")
@@ -133,8 +133,8 @@ async def api_create_pipeline(body: Dict[str, Any], _auth: None = Depends(_verif
         step_result = {"step": i, "service": service}
 
         if service == "Trapper":
-            base_url = os.environ.get("Trapper_URL", "http://localhost:3000").rstrip("/")
-            api_key = os.environ.get("Trapper_API_KEY", "")
+            base_url = os.environ.get("TRAPPER_URL", "http://localhost:3000").rstrip("/")
+            api_key = os.environ.get("TRAPPER_API_KEY", "")
             headers = {"Content-Type": "application/json"}
             if api_key:
                 headers["Authorization"] = f"Bearer {api_key}"
@@ -178,8 +178,8 @@ async def api_create_pipeline(body: Dict[str, Any], _auth: None = Depends(_verif
                 step_result["error"] = str(e)
 
         elif service == "Slinker":
-            base_url = os.environ.get("Slinker_URL", "http://localhost:8000").rstrip("/")
-            api_key = os.environ.get("Slinker_API_KEY", "")
+            base_url = os.environ.get("SLINKER_URL", "http://localhost:8000").rstrip("/")
+            api_key = os.environ.get("SLINKER_API_KEY", "")
             headers = {"Content-Type": "application/json"}
             if api_key:
                 headers["Authorization"] = f"Bearer {api_key}"
@@ -276,8 +276,8 @@ async def api_unified_search(q: str, _auth: None = Depends(_verify_token)):
     async def _search_Trapper():
         if not search_Trapper:
             return {"service": "Trapper", "results": []}
-        base_url = os.environ.get("Trapper_URL", "http://localhost:3000").rstrip("/")
-        api_key = os.environ.get("Trapper_API_KEY", "")
+        base_url = os.environ.get("TRAPPER_URL", "http://localhost:3000").rstrip("/")
+        api_key = os.environ.get("TRAPPER_API_KEY", "")
         headers = {"Content-Type": "application/json"}
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
@@ -294,8 +294,8 @@ async def api_unified_search(q: str, _auth: None = Depends(_verify_token)):
     async def _search_Slinker():
         if not search_Slinker:
             return {"service": "Slinker", "results": []}
-        base_url = os.environ.get("Slinker_URL", "http://localhost:8000").rstrip("/")
-        api_key = os.environ.get("Slinker_API_KEY", "")
+        base_url = os.environ.get("SLINKER_URL", "http://localhost:8000").rstrip("/")
+        api_key = os.environ.get("SLINKER_API_KEY", "")
         headers = {}
         if api_key:
             headers["Authorization"] = f"Bearer {api_key}"
@@ -390,8 +390,8 @@ async def api_batch_execute(body: Dict[str, Any], _auth: None = Depends(_verify_
 
         try:
             if service == "Trapper":
-                base_url = os.environ.get("Trapper_URL", "http://localhost:3000").rstrip("/")
-                api_key = os.environ.get("Trapper_API_KEY", "")
+                base_url = os.environ.get("TRAPPER_URL", "http://localhost:3000").rstrip("/")
+                api_key = os.environ.get("TRAPPER_API_KEY", "")
                 headers = {"Content-Type": "application/json"}
                 if api_key:
                     headers["Authorization"] = f"Bearer {api_key}"
@@ -418,8 +418,8 @@ async def api_batch_execute(body: Dict[str, Any], _auth: None = Depends(_verify_
                         result["status"] = "error"
                         result["error"] = resp.text
             elif service == "Slinker":
-                base_url = os.environ.get("Slinker_URL", "http://localhost:8000").rstrip("/")
-                api_key = os.environ.get("Slinker_API_KEY", "")
+                base_url = os.environ.get("SLINKER_URL", "http://localhost:8000").rstrip("/")
+                api_key = os.environ.get("SLINKER_API_KEY", "")
                 headers = {"Content-Type": "application/json"}
                 if api_key:
                     headers["Authorization"] = f"Bearer {api_key}"
