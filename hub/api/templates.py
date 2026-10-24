@@ -1,8 +1,6 @@
 """Route module: templates."""
 
 import logging
-import threading
-import time
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -10,26 +8,10 @@ from typing import Any, Dict, List, Optional
 from fastapi import Depends, HTTPException
 
 from hub import feature_store
-from hub.api.core import _approval_policies, _approval_policies_lock, _templates, _templates_lock, _verify_token
-from hub.runner import Run, agent_status, get_run, list_runs, recover_stale_runs, run_agent, stop_run
+from hub.api.core import _templates, _templates_lock, _verify_token
+from hub.runner import run_agent
 
 logger = logging.getLogger(__name__)
-
-
-async def api_list_templates(_auth: None = Depends(_verify_token)):
-    """List all available Bot templates."""
-    from hub import templates as templates_module
-    templates_list = templates_module.list_templates()
-    return {"templates": templates_list}
-
-
-async def api_get_template(name: str, _auth: None = Depends(_verify_token)):
-    """Get a single template by name."""
-    from hub import templates as templates_module
-    template = templates_module.get_template(name)
-    if template is None:
-        raise HTTPException(status_code=404, detail=f"Template '{name}' not found")
-    return template
 
 
 async def api_apply_template(
@@ -263,25 +245,11 @@ async def _execute_template_pipeline(steps: List[Dict[str, Any]]) -> Dict[str, A
 
 
 # ─── Approval Workflow ──────────────────────────────────────────────────────
-
-# Pending approvals queue
-_approvals: Dict[str, Dict[str, Any]] = {}
-_approvals_lock = threading.Lock()
-
-# Approval policies: which actions require approval
-_approval_policies: Dict[str, Any] = {
-    "enabled": False,
-    "require_for": [],  # e.g. ["external_api", "file_write", "agent_create"]
-    "auto_approve_agents": [],  # agents that bypass approval
-}
-_approval_policies_lock = threading.Lock()
-
+# (Uses _approval_policies and _approval_policies_lock imported from core.py)
 
 
 def register(app):
     """Register templates routes with the FastAPI app."""
-    app.get("/api/templates")(api_list_templates)
-    app.get("/api/templates/{name}")(api_get_template)
     app.post("/api/templates/{name}/apply", status_code=201)(api_apply_template)
     app.post("/api/templates", status_code=201)(api_create_template)
     app.get("/api/templates")(api_list_templates)

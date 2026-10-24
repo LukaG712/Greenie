@@ -50,7 +50,7 @@ async def api_Slinker_health():
     import os
 
     import httpx
-    base_url = os.environ.get("Slinker_URL", "http://Slinker:8000").rstrip("/")
+    base_url = os.environ.get("SLINKER_URL", "http://Slinker:8000").rstrip("/")
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             resp = await client.get(f"{base_url}/health")
@@ -64,7 +64,7 @@ async def api_Trapper_health():
     import os
 
     import httpx
-    base_url = os.environ.get("Trapper_URL", "http://Trapper-api:3000").rstrip("/")
+    base_url = os.environ.get("TRAPPER_URL", "http://Trapper-api:3000").rstrip("/")
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             resp = await client.get(f"{base_url}/health")
@@ -124,8 +124,8 @@ async def api_health():
     downstream = {}
     import httpx
     for service_name, env_var, default_url in [
-        ("Slinker", "Slinker_URL", "http://Slinker:8000"),
-        ("Trapper", "Trapper_URL", "http://Trapper-api:3000"),
+        ("Slinker", "SLINKER_URL", "http://Slinker:8000"),
+        ("Trapper", "TRAPPER_URL", "http://Trapper-api:3000"),
     ]:
         base_url = os.environ.get(env_var, default_url).rstrip("/")
         try:

@@ -3,12 +3,9 @@
 import asyncio
 import json
 import logging
-import threading
-import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-import httpx
 from fastapi import HTTPException
 from starlette.responses import FileResponse
 
@@ -46,9 +43,8 @@ async def serve_static(path: str):
 
 # ─── Webhook Event System ───────────────────────────────────────────────────
 
-# In-memory webhook registry
-_webhooks: Dict[str, Dict[str, Any]] = {}
-_webhooks_lock = threading.Lock()
+# Background webhook dispatch tasks — store references to prevent silent failures
+_webhook_dispatch_tasks: set = set()
 
 # Event types that can trigger webhooks
 _EVENT_TYPES = {
@@ -103,7 +99,9 @@ def _emit_event(event_type: str, data: Dict[str, Any]) -> None:
                     logger = logging.getLogger(__name__)
                     logger.warning(f"Webhook delivery failed for {target['url']}: {e}")
 
-    asyncio.create_task(_dispatch())
+    task = asyncio.create_task(_dispatch())
+    _webhook_dispatch_tasks.add(task)
+    task.add_done_callback(_webhook_dispatch_tasks.discard)
 
 
 

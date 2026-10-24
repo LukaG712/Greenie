@@ -250,8 +250,9 @@ async def api_tenant_usage(tenant_id: str, _auth: None = Depends(_verify_token))
 
 
 # ─── Database Backup & Restore ──────────────────────────────────────────────
-
-_BACKUP_DIR = Path(__file__).resolve().parent.parent / "data" / "backups"
+# Backup directory uses ~/.evershade/data/backups with env var override
+import os as _os
+_BACKUP_DIR = Path(_os.environ.get("EVERSHADE_BACKUP_DIR", str(Path(_os.path.expanduser("~")).joinpath(".evershade", "data", "backups"))))
 
 
 

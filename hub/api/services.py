@@ -41,11 +41,11 @@ async def api_services_status(_auth: None = Depends(_verify_token)):
                 "last_check": datetime.now(timezone.utc).isoformat(),
             }
 
-    Slinker_url = os.environ.get("Slinker_URL", "http://localhost:8000").rstrip("/")
-    Trapper_url = os.environ.get("Trapper_URL", "http://localhost:3000").rstrip("/")
+    Slinker_url = os.environ.get("SLINKER_URL", "http://localhost:8000").rstrip("/")
+    Trapper_url = os.environ.get("TRAPPER_URL", "http://localhost:3000").rstrip("/")
 
-    Slinker_status = await _check_service("Slinker", Slinker_url, os.environ.get("Slinker_API_KEY", ""))
-    Trapper_status = await _check_service("Trapper", Trapper_url, os.environ.get("Trapper_API_KEY", ""))
+    Slinker_status = await _check_service("Slinker", Slinker_url, os.environ.get("SLINKER_API_KEY", ""))
+    Trapper_status = await _check_service("Trapper", Trapper_url, os.environ.get("TRAPPER_API_KEY", ""))
 
     # Record health check
     with _service_health_lock:

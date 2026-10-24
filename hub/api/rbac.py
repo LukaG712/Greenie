@@ -285,6 +285,9 @@ _dead_letter_lock = threading.Lock()
 # Job worker task
 _job_worker_task: Optional[asyncio.Task] = None
 
+# Background retry tasks — store references to prevent silent failures
+_retry_tasks: set = set()
+
 
 async def _job_worker():
     """Background worker that processes jobs from the queue."""
@@ -386,11 +389,14 @@ def _handle_job_failure(job_id: str, error: str):
             job["state"] = JOB_RETRYING
             job["last_error"] = error
             job["next_retry_at"] = datetime.fromtimestamp(
-                time.time() + (2 ** retries) * 5  # Exponential backoff
+                time.time() + (2 ** retries) * 5,  # Exponential backoff
+                tz=timezone.utc
             ).isoformat()
 
-            # Re-queue for retry
-            asyncio.create_task(_retry_job(job_id, (2 ** retries) * 5))
+            # Re-queue for retry — store task reference to prevent silent failures
+            task = asyncio.create_task(_retry_job(job_id, (2 ** retries) * 5))
+            _retry_tasks.add(task)
+            task.add_done_callback(_retry_tasks.discard)
         else:
             job["state"] = JOB_DEAD
             job["last_error"] = error

@@ -28,8 +28,8 @@ async def api_Slinker_chat_stream(body: Dict[str, Any], _auth: None = Depends(_v
     import httpx
     from fastapi.responses import StreamingResponse
 
-    base_url = os.environ.get("Slinker_URL", "http://localhost:8000").rstrip("/")
-    api_key = os.environ.get("Slinker_API_KEY", "")
+    base_url = os.environ.get("SLINKER_URL", "http://localhost:8000").rstrip("/")
+    api_key = os.environ.get("SLINKER_API_KEY", "")
     messages = body.get("messages")
     if not messages:
         raise HTTPException(status_code=400, detail="messages are required")
@@ -81,8 +81,8 @@ async def api_crawl_stream(body: Dict[str, Any], _auth: None = Depends(_verify_t
     import httpx
     from fastapi.responses import StreamingResponse
 
-    base_url = os.environ.get("Trapper_URL", "http://localhost:3000").rstrip("/")
-    api_key = os.environ.get("Trapper_API_KEY", "")
+    base_url = os.environ.get("TRAPPER_URL", "http://localhost:3000").rstrip("/")
+    api_key = os.environ.get("TRAPPER_API_KEY", "")
     operation = body.get("operation", "crawl").lower()
     payload = body.get("payload", {})
 
@@ -283,8 +283,8 @@ async def _scheduled_pipeline_runner(pipeline_id: str):
 
                 try:
                     if service == "Trapper":
-                        base_url = os.environ.get("Trapper_URL", "http://localhost:3000").rstrip("/")
-                        api_key = os.environ.get("Trapper_API_KEY", "")
+                        base_url = os.environ.get("TRAPPER_URL", "http://localhost:3000").rstrip("/")
+                        api_key = os.environ.get("TRAPPER_API_KEY", "")
                         headers = {"Content-Type": "application/json"}
                         if api_key:
                             headers["Authorization"] = f"Bearer {api_key}"
@@ -312,8 +312,8 @@ async def _scheduled_pipeline_runner(pipeline_id: str):
                                 step_result["status"] = "error"
                                 step_result["error"] = resp.text
                     elif service == "Slinker":
-                        base_url = os.environ.get("Slinker_URL", "http://localhost:8000").rstrip("/")
-                        api_key = os.environ.get("Slinker_API_KEY", "")
+                        base_url = os.environ.get("SLINKER_URL", "http://localhost:8000").rstrip("/")
+                        api_key = os.environ.get("SLINKER_API_KEY", "")
                         headers = {"Content-Type": "application/json"}
                         if api_key:
                             headers["Authorization"] = f"Bearer {api_key}"
@@ -380,8 +380,8 @@ async def api_Slinker_task_stream(body: Dict[str, Any], _auth: None = Depends(_v
     import httpx
     from fastapi.responses import StreamingResponse
 
-    base_url = os.environ.get("Slinker_URL", "http://localhost:8000").rstrip("/")
-    api_key = os.environ.get("Slinker_API_KEY", "")
+    base_url = os.environ.get("SLINKER_URL", "http://localhost:8000").rstrip("/")
+    api_key = os.environ.get("SLINKER_API_KEY", "")
     task_content = body.get("task", "")
     project = body.get("project", "")
 

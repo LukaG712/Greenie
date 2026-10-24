@@ -1,5 +1,6 @@
 """MCP server API routes for Greenie."""
 
+import asyncio
 import logging
 from dataclasses import asdict
 from typing import Any, Dict
@@ -9,6 +10,9 @@ from fastapi import APIRouter, HTTPException
 from hub.mcp import mcp_manager
 
 logger = logging.getLogger(__name__)
+
+# Background MCP connection tasks — store references to prevent silent failures
+_mcp_background_tasks: set = set()
 
 router = APIRouter(prefix="/api/mcp", tags=["MCP"])
 
@@ -30,9 +34,10 @@ async def add_mcp_server(data: Dict[str, Any]):
     transport = data.get("transport", "sse")
     config = data.get("config", {})
     server = mcp_manager.add_server(name, url, transport, config)
-    # Try to connect
-    import asyncio
-    asyncio.create_task(mcp_manager.clients[name].connect())
+    # Try to connect — store task reference to prevent silent failures
+    task = asyncio.create_task(mcp_manager.clients[name].connect())
+    _mcp_background_tasks.add(task)
+    task.add_done_callback(_mcp_background_tasks.discard)
     return {"server": server.to_dict()}
 
 

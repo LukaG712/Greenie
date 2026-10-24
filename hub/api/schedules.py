@@ -11,12 +11,9 @@ from typing import Any, Dict, List, Optional
 from fastapi import Depends, HTTPException
 
 from hub import feature_store
-from hub.api.core import _scheduled_pipelines, _scheduled_pipelines_lock, _scheduled_tasks, _verify_token
+from hub.api.core import _scheduled_pipelines, _scheduled_pipelines_lock, _verify_token
 
 logger = logging.getLogger(__name__)
-
-# Scheduled task runners
-_scheduled_tasks: Dict[str, asyncio.Task] = {}
 
 
 async def _scheduled_pipeline_runner(pipeline_id: str) -> None:
