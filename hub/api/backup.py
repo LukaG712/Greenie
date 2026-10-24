@@ -64,7 +64,7 @@ async def api_create_backup(_auth: None = Depends(_verify_token)):
             "backup_file": backup_name,
             "path": str(backup_path),
             "size_bytes": file_size,
-            "created_at": dt.now().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
         }
     except Exception as e:
         if backup_path.exists():
@@ -84,7 +84,7 @@ async def api_list_backups(_auth: None = Depends(_verify_token)):
         backups.append({
             "file": f.name,
             "size_bytes": stat.st_size,
-            "created_at": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+            "created_at": datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat(),
         })
 
     return {"backups": backups, "count": len(backups)}

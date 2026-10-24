@@ -74,11 +74,10 @@ def _can_execute(service: str) -> bool:
             return True
         # Open state - check if recovery timeout has passed
         if cb["last_failure_at"]:
-            from datetime import datetime as dt
-            last_fail = dt.fromisoformat(cb["last_failure_at"])
-            if (dt.now() - last_fail).total_seconds() > cb.get("recovery_timeout", 60):
+            last_fail = datetime.fromisoformat(cb["last_failure_at"])
+            if (datetime.now(timezone.utc) - last_fail).total_seconds() > cb.get("recovery_timeout", 60):
                 cb["state"] = "half-open"
-                cb["last_state_change"] = dt.now().isoformat()
+                cb["last_state_change"] = datetime.now(timezone.utc).isoformat()
                 cb["success_count"] = 0
                 return True
         return False

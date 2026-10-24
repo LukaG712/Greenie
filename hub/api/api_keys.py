@@ -147,8 +147,8 @@ async def api_rotate_api_key(key_id: str, _auth: None = Depends(_verify_token)):
         if not old_key:
             raise HTTPException(status_code=500, detail="Key value not found")
 
-        # Generate new key
-        new_key = uuid.uuid4().hex + uuid.uuid4().hex[:16]
+        # Generate new key using secrets module for cryptographic strength
+        new_key = secrets.token_hex(24)
         key_data["key"] = new_key
         key_data["rotated_at"] = datetime.now(timezone.utc).isoformat()
         key_data["usage_count"] = 0
