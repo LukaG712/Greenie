@@ -26,7 +26,7 @@ async def api_cluster_status(_auth: None = Depends(_verify_token)):
             "message": "Cluster module not available",
         }
 
-    return cluster_module.cluster.status()
+    return await cluster_module.cluster.status()
 
 
 async def api_list_instances(_auth: None = Depends(_verify_token)):
@@ -42,7 +42,7 @@ async def api_list_instances(_auth: None = Depends(_verify_token)):
             "message": "Cluster mode disabled — running in single-instance mode",
         }
 
-    instances = cluster_module.cluster.instance_registry.get_instances()
+    instances = await cluster_module.cluster.instance_registry.get_instances()
     active = [i for i in instances if i["status"] == "active"]
     stale = [i for i in instances if i["status"] == "stale"]
 
@@ -72,7 +72,7 @@ async def api_heartbeat(_auth: None = Depends(_verify_token)):
     if not instance_id:
         raise HTTPException(status_code=500, detail="Instance not registered")
 
-    updated = cluster_module.cluster.instance_registry.heartbeat(instance_id)
+    updated = await cluster_module.cluster.instance_registry.heartbeat(instance_id)
     return {
         "status": "ok" if updated else "error",
         "instance_id": instance_id,

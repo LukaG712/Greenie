@@ -133,31 +133,57 @@ def rotate_api_key(service: str, rotated_by: str = "api", reason: str = "routine
 def rotate_hider_encryption_key(rotated_by: str = "api", reason: str = "routine") -> dict:
     """Rotate the Hider encryption key.
     
-    This re-encrypts all stored secrets with the new key.
+    This re-encrypts all stored secrets with the new key by calling the Hider API.
     """
     old_key = os.getenv("ENCRYPTION_KEY", "")
     new_key = secrets.token_urlsafe(32)
     
-    # In production, this would:
-    # 1. Decrypt all secrets with old key
-    # 2. Encrypt all secrets with new key
-    # 3. Update ENCRYPTION_KEY env var
+    # Attempt to re-encrypt all secrets via the Hider API
+    hider_url = os.getenv("Hider_URL", "http://localhost:8005")
+    hider_api_key = os.getenv("Hider_API_KEY", "")
+    reencrypted = False
+    try:
+        headers = {}
+        if hider_api_key:
+            headers["Authorization"] = f"Bearer {hider_api_key}"
+        with httpx.Client(timeout=30) as client:
+            resp = client.post(
+                f"{hider_url}/api/reencrypt",
+                json={"new_key": new_key},
+                headers=headers,
+            )
+            if resp.status_code == 200:
+                reencrypted = True
+                logger.info("Successfully re-encrypted all Hider secrets")
+            else:
+                logger.warning(
+                    "Hider re-encrypt failed with HTTP %d: %s",
+                    resp.status_code, resp.text,
+                )
+    except Exception as e:
+        logger.warning("Failed to re-encrypt Hider secrets: %s", e)
     
     os.environ["ENCRYPTION_KEY"] = new_key
     
     _record_rotation("encryption_key", "hider", rotated_by, reason, old_key, new_key)
     logger.info("Rotated Hider encryption key")
     
+    note = "All secrets have been re-encrypted. Restart Hider service."
+    if not reencrypted:
+        note = "WARNING: Could not re-encrypt secrets automatically. " \
+               "Manually re-encrypt via Hider API before restarting, or secrets will be lost."
+    
     return {
         "service": "hider",
         "rotated_at": datetime.now(timezone.utc).isoformat(),
-        "note": "All secrets have been re-encrypted. Restart Hider service.",
+        "reencrypted": reencrypted,
+        "note": note,
     }
 
 
 def rotate_session_secret(rotated_by: str = "api", reason: str = "routine") -> dict:
     """Rotate the session signing secret."""
-    old_secret = os.getenv("SESSION_SECRET", secrets.token_urlsafe(16))
+    old_secret = os.getenv("SESSION_SECRET", "")
     new_secret = secrets.token_urlsafe(32)
     
     os.environ["SESSION_SECRET"] = new_secret

@@ -205,7 +205,7 @@ async def api_health():
     # Cluster status
     try:
         from hub import cluster as cluster_module
-        health["cluster"] = cluster_module.cluster.status()
+        health["cluster"] = await cluster_module.cluster.status()
     except Exception:
         health["cluster"] = {"available": False, "message": "Cluster module not available"}
 

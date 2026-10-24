@@ -209,7 +209,7 @@ class InstanceRegistry:
     def __init__(self, redis):
         self._redis = redis
 
-    def register(self, instance_id: str, host: str = "", port: int = 0) -> Dict[str, Any]:
+    async def register(self, instance_id: str, host: str = "", port: int = 0) -> Dict[str, Any]:
         """Register an instance in the cluster."""
         instance = {
             "id": instance_id,
@@ -220,33 +220,35 @@ class InstanceRegistry:
             "status": "active",
         }
         try:
-            self._redis.hset(self._INSTANCES_KEY, instance_id, json.dumps(instance))
-            self._redis.expire(self._INSTANCES_KEY, 3600)  # 1 hour TTL, renewed on heartbeat
+            await self._redis.hset(self._INSTANCES_KEY, instance_id, json.dumps(instance))
+            await self._redis.expire(self._INSTANCES_KEY, 3600)  # 1 hour TTL, renewed on heartbeat
             logger.info("Registered instance %s at %s:%d", instance_id, instance["host"], instance["port"])
         except Exception as e:
             logger.warning("Failed to register instance: %s", e)
         return instance
 
-    def heartbeat(self, instance_id: str) -> bool:
+    async def heartbeat(self, instance_id: str) -> bool:
         """Update heartbeat for an instance."""
         try:
-            instance_json = self._redis.hget(self._INSTANCES_KEY, instance_id)
+            instance_json = await self._redis.hget(self._INSTANCES_KEY, instance_id)
             if instance_json:
+                if isinstance(instance_json, bytes):
+                    instance_json = instance_json.decode()
                 instance = json.loads(instance_json)
                 instance["last_heartbeat"] = datetime.now(timezone.utc).isoformat()
                 instance["status"] = "active"
-                self._redis.hset(self._INSTANCES_KEY, instance_id, json.dumps(instance))
-                self._redis.expire(self._INSTANCES_KEY, 3600)
+                await self._redis.hset(self._INSTANCES_KEY, instance_id, json.dumps(instance))
+                await self._redis.expire(self._INSTANCES_KEY, 3600)
                 return True
             return False
         except Exception as e:
             logger.warning("Failed to update heartbeat: %s", e)
             return False
 
-    def deregister(self, instance_id: str) -> bool:
+    async def deregister(self, instance_id: str) -> bool:
         """Remove an instance from the cluster."""
         try:
-            deleted = self._redis.hdel(self._INSTANCES_KEY, instance_id)
+            deleted = await self._redis.hdel(self._INSTANCES_KEY, instance_id)
             if deleted:
                 logger.info("Deregistered instance %s", instance_id)
             return deleted > 0
@@ -254,11 +256,17 @@ class InstanceRegistry:
             logger.warning("Failed to deregister instance: %s", e)
             return False
 
-    def get_instances(self) -> List[Dict[str, Any]]:
+    async def get_instances(self) -> List[Dict[str, Any]]:
         """Get all registered instances."""
         try:
-            values = self._redis.hvals(self._INSTANCES_KEY)
-            instances = [json.loads(v) for v in values]
+            values = await self._redis.hvals(self._INSTANCES_KEY)
+            # Handle bytes from Redis with decode_responses=False
+            decoded_values = []
+            for v in values:
+                if isinstance(v, bytes):
+                    v = v.decode()
+                decoded_values.append(v)
+            instances = [json.loads(v) for v in decoded_values]
             # Mark stale instances
             now = time.time()
             for inst in instances:
@@ -273,14 +281,15 @@ class InstanceRegistry:
             logger.warning("Failed to get instances: %s", e)
             return []
 
-    def get_active_instances(self) -> List[Dict[str, Any]]:
+    async def get_active_instances(self) -> List[Dict[str, Any]]:
         """Get only active (non-stale) instances."""
-        return [i for i in self.get_instances() if i["status"] == "active"]
+        instances = await self.get_instances()
+        return [i for i in instances if i["status"] == "active"]
 
-    def count(self) -> int:
+    async def count(self) -> int:
         """Get the number of registered instances."""
         try:
-            return self._redis.hlen(self._INSTANCES_KEY)
+            return await self._redis.hlen(self._INSTANCES_KEY)
         except Exception:
             return 0
 
@@ -294,40 +303,45 @@ class SessionAffinity:
     def __init__(self, redis):
         self._redis = redis
 
-    def bind(self, session_id: str, instance_id: str, ttl: int = _DEFAULT_TTL) -> bool:
+    async def bind(self, session_id: str, instance_id: str, ttl: int = _DEFAULT_TTL) -> bool:
         """Bind a session to an instance."""
         try:
-            self._redis.hset(self._SESSIONS_KEY, session_id, instance_id)
-            self._redis.expire(self._SESSIONS_KEY, ttl)
+            await self._redis.hset(self._SESSIONS_KEY, session_id, instance_id)
+            await self._redis.expire(self._SESSIONS_KEY, ttl)
             return True
         except Exception as e:
             logger.warning("Failed to bind session: %s", e)
             return False
 
-    def get_instance(self, session_id: str) -> Optional[str]:
+    async def get_instance(self, session_id: str) -> Optional[str]:
         """Get the instance ID for a session."""
         try:
-            return self._redis.hget(self._SESSIONS_KEY, session_id)
+            result = await self._redis.hget(self._SESSIONS_KEY, session_id)
+            if isinstance(result, bytes):
+                result = result.decode()
+            return result
         except Exception:
             return None
 
-    def release(self, session_id: str) -> bool:
+    async def release(self, session_id: str) -> bool:
         """Release a session binding."""
         try:
-            return self._redis.hdel(self._SESSIONS_KEY, session_id) > 0
+            return await self._redis.hdel(self._SESSIONS_KEY, session_id) > 0
         except Exception:
             return False
 
-    def cleanup_stale(self, active_instance_ids: List[str]) -> int:
+    async def cleanup_stale(self, active_instance_ids: List[str]) -> int:
         """Remove sessions bound to non-active instances."""
         try:
             removed = 0
-            sessions = self._redis.hgetall(self._SESSIONS_KEY)
+            sessions = await self._redis.hgetall(self._SESSIONS_KEY)
             for session_id, instance_id in sessions.items():
+                if isinstance(session_id, bytes):
+                    session_id = session_id.decode()
                 if isinstance(instance_id, bytes):
                     instance_id = instance_id.decode()
                 if instance_id not in active_instance_ids:
-                    self._redis.hdel(self._SESSIONS_KEY, session_id)
+                    await self._redis.hdel(self._SESSIONS_KEY, session_id)
                     removed += 1
             return removed
         except Exception as e:
@@ -417,7 +431,7 @@ class ClusterManager:
 
             # Register this instance
             port = int(os.environ.get("HUB_PORT", "8080"))
-            self._instance_registry.register(self._instance_id, port=port)
+            await self._instance_registry.register(self._instance_id, port=port)
 
             # Start heartbeat
             self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
@@ -445,7 +459,7 @@ class ClusterManager:
                 pass
 
         if self._instance_id and self._instance_registry:
-            self._instance_registry.deregister(self._instance_id)
+            await self._instance_registry.deregister(self._instance_id)
 
         if self._redis:
             await self._redis.close()
@@ -470,13 +484,13 @@ class ClusterManager:
         while True:
             try:
                 await asyncio.sleep(10)
-                self._instance_registry.heartbeat(self._instance_id)
+                await self._instance_registry.heartbeat(self._instance_id)
             except asyncio.CancelledError:
                 break
             except Exception as e:
                 logger.warning("Heartbeat failed: %s", e)
 
-    def status(self) -> Dict[str, Any]:
+    async def status(self) -> Dict[str, Any]:
         """Get cluster status for health checks."""
         result = {
             "available": self._available,
@@ -485,7 +499,7 @@ class ClusterManager:
             "redis_port": self._redis_port,
         }
         if self._available and self._instance_registry:
-            instances = self._instance_registry.get_instances()
+            instances = await self._instance_registry.get_instances()
             result["instances"] = instances
             result["active_instances"] = len([i for i in instances if i["status"] == "active"])
         return result

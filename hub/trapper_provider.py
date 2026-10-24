@@ -145,20 +145,15 @@ class TrapperProvider(AgentProvider):
                         )
 
             try:
-                loop = asyncio.new_event_loop()
-            except Exception:
                 loop = asyncio.get_running_loop()
-            if loop.is_running():
-                # Already in async context — use run_in_executor to avoid blocking
+                # Already in async context — run in a separate thread to avoid blocking
                 import concurrent.futures
                 with concurrent.futures.ThreadPoolExecutor() as executor:
-                    future = executor.submit(loop.run_until_complete, _execute())
+                    future = executor.submit(asyncio.run, _execute())
                     return future.result()
-            else:
-                try:
-                    return loop.run_until_complete(_execute())
-                finally:
-                    loop.close()
+            except RuntimeError:
+                # No running event loop — run directly
+                return asyncio.run(_execute())
 
         except httpx.ConnectError as e:
             return ProviderRunResult(
