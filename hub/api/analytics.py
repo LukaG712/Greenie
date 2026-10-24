@@ -123,10 +123,6 @@ async def api_reset_analytics(_auth: None = Depends(_verify_token)):
     return {"status": "ok", "message": "Analytics data reset"}
 
 
-# ─── Data Export/Import ─────────────────────────────────────────────────────
-
-
-
 def register(app):
     """Register analytics routes with the FastAPI app."""
     app.get("/api/analytics/overview")(api_analytics_overview)

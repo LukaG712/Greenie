@@ -1,11 +1,10 @@
 """Route module: audit."""
 
-import threading
 from typing import Any, Dict, List, Optional
 
 from fastapi import Depends
 
-from hub.api.core import _audit_log, _audit_log_lock, _templates, _templates_lock, _verify_token
+from hub.api.core import _audit_log, _audit_log_lock, _verify_token
 
 
 async def api_list_audit(
@@ -65,14 +64,6 @@ async def api_clear_audit(_auth: None = Depends(_verify_token)):
     with _audit_log_lock:
         _audit_log.clear()
     return {"status": "ok", "message": "Audit log cleared"}
-
-
-# ─── Template Management ────────────────────────────────────────────────────
-
-# In-memory template store
-_templates: Dict[str, Dict[str, Any]] = {}
-_templates_lock = threading.Lock()
-
 
 
 def register(app):
